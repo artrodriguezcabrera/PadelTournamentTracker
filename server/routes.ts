@@ -278,6 +278,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   let round = 1;
   const usedPairings = new Set<string>();
   const playerGameCounts = new Map<number, number>();
+  const requiredRounds = playerIds.length - 1; // N-1 rounds required
 
   // Initialize game counts for all players
   playerIds.forEach(id => playerGameCounts.set(id, 0));
@@ -301,25 +302,29 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     });
   };
 
-  // Keep generating rounds until we can't make more valid matches
-  let consecutiveFailedAttempts = 0;
-  const maxFailedAttempts = 10; // Increased to allow more attempts for finding valid combinations
+  // Generate all possible pairings
+  const allPossiblePairings = new Set<string>();
+  for (let i = 0; i < playerIds.length; i++) {
+    for (let j = i + 1; j < playerIds.length; j++) {
+      allPossiblePairings.add([playerIds[i], playerIds[j]].sort((a, b) => a - b).join(','));
+    }
+  }
 
-  while (consecutiveFailedAttempts < maxFailedAttempts) {
-    const availablePlayers = new Set(playerIds);
+  // Keep generating rounds until we achieve all required rounds
+  while (round <= requiredRounds) {
     const roundMatches: Match[] = [];
-    let matchesInRound = 0;
+    const availablePlayers = new Set(playerIds);
 
-    // Try to create matches for each court
+    // Try to create matches for each court in this round
     for (let court = 1; court <= numCourts && availablePlayers.size >= 4; court++) {
       let validMatch = false;
       let attempts = 0;
-      const maxAttempts = 100; // Increased attempts to find better combinations
+      const maxAttempts = 200; // Increased attempts to find valid combinations
 
       while (!validMatch && attempts < maxAttempts && availablePlayers.size >= 4) {
         attempts++;
 
-        // Sort players by number of games played to prioritize those with fewer games
+        // Sort available players by number of games played and partnerships formed
         const playerArray = Array.from(availablePlayers)
           .sort((a, b) => {
             const aGames = playerGameCounts.get(a) || 0;
@@ -327,66 +332,37 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
             return aGames - bGames;
           });
 
-        // Take the first 4 players
-        const selectedPlayers = playerArray.slice(0, 4);
+        // Try to find valid combinations of 4 players
+        const combinations = generatePossibleTeamCombinations(playerArray.slice(0, 6));
 
-        if (selectedPlayers.length === 4) {
-          // Try different team combinations to find one that hasn't played together
-          const combinations = generatePossibleTeamCombinations(selectedPlayers);
+        for (const combo of combinations) {
+          const team1HasPlayedTogether = hasPairingBeenUsed(combo[0], combo[1]);
+          const team2HasPlayedTogether = hasPairingBeenUsed(combo[2], combo[3]);
 
-          for (const combo of combinations) {
-            const team1HasPlayedTogether = hasPairingBeenUsed(combo[0], combo[1]);
-            const team2HasPlayedTogether = hasPairingBeenUsed(combo[2], combo[3]);
+          if (!team1HasPlayedTogether && !team2HasPlayedTogether) {
+            markPairingUsed(combo[0], combo[1]);
+            markPairingUsed(combo[2], combo[3]);
+            incrementPlayerGames(combo);
 
-            if (!team1HasPlayedTogether && !team2HasPlayedTogether) {
-              markPairingUsed(combo[0], combo[1]);
-              markPairingUsed(combo[2], combo[3]);
-              incrementPlayerGames(combo);
+            // Remove these players from available pool
+            combo.forEach(p => availablePlayers.delete(p));
 
-              // Remove these players from available pool
-              combo.forEach(p => availablePlayers.delete(p));
+            roundMatches.push({
+              players: combo,
+              round,
+              court,
+            });
 
-              roundMatches.push({
-                players: combo,
-                round,
-                court,
-              });
-
-              validMatch = true;
-              matchesInRound++;
-              break;
-            }
+            validMatch = true;
+            break;
           }
         }
       }
     }
 
-    if (matchesInRound === 0) {
-      consecutiveFailedAttempts++;
-    } else {
-      consecutiveFailedAttempts = 0;
+    if (roundMatches.length > 0) {
       matches.push(...roundMatches);
       round++;
-    }
-
-    // Check if we have achieved all possible pairings
-    const totalPairs = new Set<string>();
-    for (let i = 0; i < playerIds.length; i++) {
-      for (let j = i + 1; j < playerIds.length; j++) {
-        totalPairs.add([playerIds[i], playerIds[j]].sort((a, b) => a - b).join(','));
-      }
-    }
-
-    // If we've used all possible pairings, we can stop
-    let allPairingsUsed = true;
-    totalPairs.forEach(pair => {
-      if (!usedPairings.has(pair)) {
-        allPairingsUsed = false;
-      }
-    });
-
-    if (allPairingsUsed) {
-      break;
     }
   }
 
@@ -395,8 +371,17 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   const minGames = Math.min(...gameCounts);
   const maxGames = Math.max(...gameCounts);
 
-  // Strict balance check - maximum 1 game difference
+  // Maximum 1 game difference is allowed
   if (maxGames - minGames > 1) {
+    console.log("Games not balanced:", Object.fromEntries(playerGameCounts));
+    return [];
+  }
+
+  // Verify all required partnerships were formed
+  const allPartnershipsFormed = Array.from(allPossiblePairings).every(pair => usedPairings.has(pair));
+  if (!allPartnershipsFormed) {
+    console.log("Not all partnerships formed");
+    console.log("Missing partnerships:", Array.from(allPossiblePairings).filter(pair => !usedPairings.has(pair)));
     return [];
   }
 
@@ -405,12 +390,19 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
 // Helper function to generate all possible team combinations for 4 players
 function generatePossibleTeamCombinations(players: number[]): number[][] {
-  return [
-    [players[0], players[1], players[2], players[3]],
-    [players[0], players[2], players[1], players[3]],
-    [players[0], players[3], players[1], players[2]],
-    [players[1], players[2], players[0], players[3]],
-    [players[1], players[3], players[0], players[2]],
-    [players[2], players[3], players[0], players[1]]
-  ];
+  if (players.length < 4) return []; //Handle cases with fewer than 4 players
+
+  const combinations: number[][] = [];
+  for (let i = 0; i < players.length; i++) {
+    for (let j = i + 1; j < players.length; j++) {
+      for (let k = 0; k < players.length; k++) {
+        if (k === i || k === j) continue;
+        for (let l = k + 1; l < players.length; l++) {
+          if (l === i || l === j) continue;
+          combinations.push([players[i], players[j], players[k], players[l]]);
+        }
+      }
+    }
+  }
+  return combinations;
 }
