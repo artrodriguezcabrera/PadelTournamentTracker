@@ -9,25 +9,19 @@ import {
 import { Card } from "@/components/ui/card";
 import { calculateStandings } from "@/lib/tournament";
 import { Trophy, Medal } from "lucide-react";
+import { type Game } from "@db/schema";
+
+type TournamentPlayer = {
+  playerId: number;
+  player: {
+    id: number;
+    name: string;
+  };
+};
 
 type StandingsTableProps = {
-  games: Array<{
-    id: number;
-    player1Id: number;
-    player2Id: number;
-    player3Id: number;
-    player4Id: number;
-    team1Score: number | null;
-    team2Score: number | null;
-    isComplete: boolean;
-  }>;
-  players: Array<{
-    playerId: number;
-    player?: {
-      id: number;
-      name: string;
-    };
-  }>;
+  games: Game[];
+  players: TournamentPlayer[];
   pointSystem: number;
 };
 
@@ -36,7 +30,9 @@ export default function StandingsTable({
   players,
   pointSystem,
 }: StandingsTableProps) {
-  const standings = calculateStandings(games, players, pointSystem);
+  // Convert tournament players to the format expected by calculateStandings
+  const formattedPlayers = players.map(tp => tp.player);
+  const standings = calculateStandings(games, formattedPlayers, pointSystem);
 
   // Sort standings by total points descending
   const sortedStandings = [...standings].sort((a, b) => b.points - a.points);
