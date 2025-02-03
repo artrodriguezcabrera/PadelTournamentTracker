@@ -301,14 +301,6 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     });
   };
 
-  // Function to check if a player has played more games than others
-  const hasPlayedTooMany = (playerId: number) => {
-    const playerGames = playerGameCounts.get(playerId) || 0;
-    const minGames = Math.min(...Array.from(playerGameCounts.values()));
-    // Stricter balance - only allow 1 more game than the minimum
-    return playerGames > minGames;
-  };
-
   // Keep generating rounds until we can't make more valid matches
   let consecutiveFailedAttempts = 0;
   const maxFailedAttempts = 5; // Increased to allow more attempts for balance
@@ -338,9 +330,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
           });
 
         // Take the first 4 players who haven't played too many games
-        const selectedPlayers = playerArray
-          .filter(playerId => !hasPlayedTooMany(playerId))
-          .slice(0, 4);
+        const selectedPlayers = playerArray.slice(0, 4);
 
         if (selectedPlayers.length === 4) {
           // Try different team combinations to find one that hasn't played together
@@ -354,14 +344,14 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
             const team1HasPlayedTogether = hasPairingBeenUsed(combo[0], combo[1]);
             const team2HasPlayedTogether = hasPairingBeenUsed(combo[2], combo[3]);
 
-            // Check if this combination would maintain balance
+            // Check if this combination would maintain reasonable balance
             const wouldMaintainBalance = combo.every(playerId => {
               const futureGames = (playerGameCounts.get(playerId) || 0) + 1;
               const minCurrentGames = Math.min(...Array.from(playerGameCounts.values()));
-              return futureGames <= minCurrentGames + 1;
+              return futureGames <= minCurrentGames + 2; // Allow slightly more imbalance during generation
             });
 
-            if ((!team1HasPlayedTogether || !team2HasPlayedTogether) && wouldMaintainBalance) {
+            if (!team1HasPlayedTogether && !team2HasPlayedTogether && wouldMaintainBalance) {
               markPairingUsed(combo[0], combo[1]);
               markPairingUsed(combo[2], combo[3]);
               incrementPlayerGames(combo);
