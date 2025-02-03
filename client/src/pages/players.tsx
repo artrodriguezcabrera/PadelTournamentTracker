@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Edit, Trash2 } from "lucide-react";
+import { UserPlus, Edit, Trash2, ArrowLeft } from "lucide-react";
 import AddEditPlayerForm from "@/components/add-edit-player-form";
 import { type Player } from "@db/schema";
 
@@ -20,27 +20,34 @@ export default function Players() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-bold">Players</h1>
-          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add Player
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <AddEditPlayerForm
-                onSuccess={() => {
-                  setIsAddOpen(false);
-                  toast({
-                    title: "Player added",
-                    description: "The player has been added successfully.",
-                  });
-                }}
-              />
-            </DialogContent>
-          </Dialog>
+        <div className="flex items-center gap-4 mb-8">
+          <Button variant="ghost" size="icon" asChild>
+            <a href="/">
+              <ArrowLeft className="h-4 w-4" />
+            </a>
+          </Button>
+          <div className="flex-1 flex justify-between items-center">
+            <h1 className="text-4xl font-bold">Players</h1>
+            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add Player
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <AddEditPlayerForm
+                  onSuccess={() => {
+                    setIsAddOpen(false);
+                    toast({
+                      title: "Player added",
+                      description: "The player has been added successfully.",
+                    });
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
