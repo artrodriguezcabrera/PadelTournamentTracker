@@ -334,11 +334,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
         if (selectedPlayers.length === 4) {
           // Try different team combinations to find one that hasn't played together
-          const combinations = [
-            [selectedPlayers[0], selectedPlayers[1], selectedPlayers[2], selectedPlayers[3]],
-            [selectedPlayers[0], selectedPlayers[2], selectedPlayers[1], selectedPlayers[3]],
-            [selectedPlayers[0], selectedPlayers[3], selectedPlayers[1], selectedPlayers[2]]
-          ];
+          const combinations = generatePossibleTeamCombinations(selectedPlayers);
 
           for (const combo of combinations) {
             const team1HasPlayedTogether = hasPairingBeenUsed(combo[0], combo[1]);
@@ -348,7 +344,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
             const wouldMaintainBalance = combo.every(playerId => {
               const futureGames = (playerGameCounts.get(playerId) || 0) + 1;
               const minCurrentGames = Math.min(...Array.from(playerGameCounts.values()));
-              return futureGames <= minCurrentGames + 2; // Allow slightly more imbalance during generation
+              return futureGames <= minCurrentGames + 1; 
             });
 
             if (!team1HasPlayedTogether && !team2HasPlayedTogether && wouldMaintainBalance) {
@@ -381,6 +377,13 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       matches.push(...roundMatches);
       round++;
     }
+
+    // Check if we have achieved all possible pairings
+    const totalPlayers = playerIds.length;
+    const maxPossiblePairings = (totalPlayers * (totalPlayers - 1)) / 2; // n(n-1)/2
+    if (usedPairings.size >= maxPossiblePairings) {
+      break; // We've achieved all possible pairings
+    }
   }
 
   // Verify that games are balanced
@@ -394,4 +397,16 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   }
 
   return matches;
+}
+
+// Helper function to generate all possible team combinations for 4 players
+function generatePossibleTeamCombinations(players: number[]): number[][] {
+  return [
+    [players[0], players[1], players[2], players[3]],
+    [players[0], players[2], players[1], players[3]],
+    [players[0], players[3], players[1], players[2]],
+    [players[1], players[2], players[0], players[3]],
+    [players[1], players[3], players[0], players[2]],
+    [players[2], players[3], players[0], players[1]]
+  ];
 }
