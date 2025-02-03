@@ -61,7 +61,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/tournaments", async (req, res) => {
-    const { name, pointSystem, playerIds } = req.body;
+    const { name, pointSystem, courts, playerIds } = req.body;
 
     // Ensure we have at least 4 players
     if (playerIds.length < 4) {
@@ -72,7 +72,7 @@ export function registerRoutes(app: Express): Server {
     const newTournament = await db.transaction(async (tx) => {
       const [tournament] = await tx
         .insert(tournaments)
-        .values({ name, pointSystem })
+        .values({ name, pointSystem, courts })
         .returning();
 
       await tx.insert(tournamentPlayers).values(
@@ -106,9 +106,9 @@ export function registerRoutes(app: Express): Server {
       return;
     }
 
-    // Generate all possible game combinations
-    const playerIds = tournamentData.tournamentPlayers.map(tp => tp.player.id);
-    const gameMatches = generateGameMatches(playerIds);
+    // Generate all possible game combinations with court assignments
+    const playerIds = tournamentData.tournamentPlayers.map(tp => tp.playerId);
+    const gameMatches = generateGameMatchesWithCourts(playerIds, tournamentData.courts);
 
     await db.transaction(async (tx) => {
       await tx
@@ -119,10 +119,12 @@ export function registerRoutes(app: Express): Server {
       await tx.insert(games).values(
         gameMatches.map(match => ({
           tournamentId,
-          player1Id: match[0],
-          player2Id: match[1],
-          player3Id: match[2],
-          player4Id: match[3],
+          roundNumber: match.round,
+          courtNumber: match.court,
+          player1Id: match.players[0],
+          player2Id: match.players[1],
+          player3Id: match.players[2],
+          player4Id: match.players[3],
         }))
       );
     });
@@ -192,27 +194,50 @@ export function registerRoutes(app: Express): Server {
   return httpServer;
 }
 
-function generateGameMatches(playerIds: number[]): number[][] {
+type Match = {
+  players: number[];
+  round: number;
+  court: number;
+};
+
+function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): Match[] {
   if (playerIds.length < 4) {
     throw new Error("Not enough players to generate matches");
   }
 
-  const matches: number[][] = [];
+  const matches: Match[] = [];
   const n = playerIds.length;
+  let round = 1;
 
   // Generate all possible combinations of 4 players
-  // This ensures each player gets to play with and against every other player
   for (let i = 0; i < n - 3; i++) {
     for (let j = i + 1; j < n - 2; j++) {
       for (let k = j + 1; k < n - 1; k++) {
         for (let l = k + 1; l < n; l++) {
-          // Create all possible team combinations for these 4 players
-          // (i,j) vs (k,l)
-          matches.push([playerIds[i], playerIds[j], playerIds[k], playerIds[l]]);
-          // (i,k) vs (j,l)
-          matches.push([playerIds[i], playerIds[k], playerIds[j], playerIds[l]]);
-          // (i,l) vs (j,k)
-          matches.push([playerIds[i], playerIds[l], playerIds[j], playerIds[k]]);
+          // For each set of 4 players, create different team combinations
+          const courtAssignments = [
+            // (i,j) vs (k,l)
+            { players: [playerIds[i], playerIds[j], playerIds[k], playerIds[l]] },
+            // (i,k) vs (j,l)
+            { players: [playerIds[i], playerIds[k], playerIds[j], playerIds[l]] },
+            // (i,l) vs (j,k)
+            { players: [playerIds[i], playerIds[l], playerIds[j], playerIds[k]] }
+          ];
+
+          // Assign rounds and courts
+          courtAssignments.forEach((match, index) => {
+            const court = (matches.length % numCourts) + 1;
+            // Start a new round when we've used all courts
+            if (court === 1 && matches.length > 0) {
+              round++;
+            }
+
+            matches.push({
+              ...match,
+              round,
+              court,
+            });
+          });
         }
       }
     }

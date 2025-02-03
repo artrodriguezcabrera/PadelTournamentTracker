@@ -12,6 +12,7 @@ export const tournaments = pgTable("tournaments", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   pointSystem: integer("point_system").notNull(), // 16, 24, or 32
+  courts: integer("courts").notNull().default(1),
   isActive: boolean("is_active").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -25,6 +26,8 @@ export const tournamentPlayers = pgTable("tournament_players", {
 export const games = pgTable("games", {
   id: serial("id").primaryKey(),
   tournamentId: integer("tournament_id").references(() => tournaments.id),
+  roundNumber: integer("round_number").notNull().default(1),
+  courtNumber: integer("court_number").notNull().default(1),
   player1Id: integer("player1_id").references(() => players.id),
   player2Id: integer("player2_id").references(() => players.id),
   player3Id: integer("player3_id").references(() => players.id),

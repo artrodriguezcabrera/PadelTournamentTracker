@@ -26,6 +26,7 @@ import { queryClient } from "@/lib/queryClient";
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   pointSystem: z.enum(["16", "24", "32"]),
+  courts: z.string().transform((val) => parseInt(val)),
   playerIds: z.array(z.number()).min(4, "At least 4 players are required"),
 });
 
@@ -38,6 +39,7 @@ export default function TournamentForm({ onSuccess }: TournamentFormProps) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       pointSystem: "16",
+      courts: "1",
       playerIds: [],
     },
   });
@@ -91,6 +93,30 @@ export default function TournamentForm({ onSuccess }: TournamentFormProps) {
                   <SelectItem value="16">16 Points</SelectItem>
                   <SelectItem value="24">24 Points</SelectItem>
                   <SelectItem value="32">32 Points</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="courts"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Number of Courts</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select courts" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="1">1 Court</SelectItem>
+                  <SelectItem value="2">2 Courts</SelectItem>
+                  <SelectItem value="3">3 Courts</SelectItem>
+                  <SelectItem value="4">4 Courts</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
