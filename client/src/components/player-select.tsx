@@ -19,11 +19,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import { type Player } from "@db/schema";
 
 type PlayerSelectProps = {
   value: number[];
@@ -35,7 +35,7 @@ export default function PlayerSelect({ value, onChange }: PlayerSelectProps) {
   const [newPlayerName, setNewPlayerName] = useState("");
   const [isAddingPlayer, setIsAddingPlayer] = useState(false);
 
-  const { data: players = [] } = useQuery({
+  const { data: players = [] } = useQuery<Player[]>({
     queryKey: ["/api/players"],
   });
 
@@ -48,7 +48,7 @@ export default function PlayerSelect({ value, onChange }: PlayerSelectProps) {
       const response = await apiRequest("POST", "/api/players", {
         name: newPlayerName.trim(),
       });
-      const newPlayer = await response.json();
+      const newPlayer: Player = await response.json();
       onChange([...value, newPlayer.id]);
       setNewPlayerName("");
       setIsAddingPlayer(false);

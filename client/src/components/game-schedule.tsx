@@ -5,10 +5,18 @@ import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
+import { type Game } from "@db/schema";
+
+type GameWithPlayers = Game & {
+  player1: { name: string };
+  player2: { name: string };
+  player3: { name: string };
+  player4: { name: string };
+};
 
 type GameScheduleProps = {
   tournamentId: number;
-  games: any[];
+  games: GameWithPlayers[];
 };
 
 export default function GameSchedule({ tournamentId, games }: GameScheduleProps) {
@@ -56,10 +64,10 @@ export default function GameSchedule({ tournamentId, games }: GameScheduleProps)
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1">
                 <p className="font-medium">
-                  Team 1: {game.player1Name} & {game.player2Name}
+                  Team 1: {game.player1.name} & {game.player2.name}
                 </p>
                 <p className="font-medium">
-                  Team 2: {game.player3Name} & {game.player4Name}
+                  Team 2: {game.player3.name} & {game.player4.name}
                 </p>
               </div>
 
