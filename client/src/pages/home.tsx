@@ -5,12 +5,32 @@ import { Button } from "@/components/ui/button";
 import TournamentForm from "@/components/tournament-form";
 import EditTournamentPlayers from "@/components/edit-tournament-players";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trophy, Users } from "lucide-react";
+import { Trophy, Users, MoreVertical, Edit, Trash } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 
 export default function Home() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingTournament, setEditingTournament] = useState<number | null>(null);
+  const [editingPlayers, setEditingPlayers] = useState<number | null>(null);
+  const [deletingTournament, setDeletingTournament] = useState<number | null>(null);
   const { toast } = useToast();
 
   const { data: tournaments } = useQuery({
@@ -29,7 +49,6 @@ export default function Home() {
       return data;
     },
     onSuccess: (_data, tournamentId) => {
-      // After successfully starting the tournament, navigate to the tournament page
       window.location.href = `/tournament/${tournamentId}`;
     },
     onError: (error: Error) => {
@@ -37,6 +56,19 @@ export default function Home() {
         title: "Error",
         description: error.message,
         variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTournament = useMutation({
+    mutationFn: async (tournamentId: number) => {
+      await apiRequest("DELETE", `/api/tournaments/${tournamentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tournaments"] });
+      toast({
+        title: "Tournament deleted",
+        description: "The tournament has been deleted successfully.",
       });
     },
   });
@@ -76,14 +108,42 @@ export default function Home() {
           {tournaments?.map((tournament) => (
             <Card key={tournament.id}>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Trophy className="h-5 w-5" />
-                  {tournament.name}
-                </CardTitle>
+                <div className="flex justify-between items-start">
+                  <CardTitle className="flex items-center gap-2">
+                    <Trophy className="h-5 w-5" />
+                    {tournament.name}
+                  </CardTitle>
+                  {!tournament.isActive && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => setEditingTournament(tournament.id)}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Tournament
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => setDeletingTournament(tournament.id)}
+                        >
+                          <Trash className="h-4 w-4 mr-2" />
+                          Delete Tournament
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
                   Point System: {tournament.pointSystem} points
+                  <br />
+                  Courts: {tournament.courts}
                 </p>
                 <div className="flex flex-col gap-2">
                   {tournament.isActive ? (
@@ -107,9 +167,9 @@ export default function Home() {
                         {startTournament.isPending ? "Starting..." : "Start Tournament"}
                       </Button>
                       <Dialog
-                        open={editingTournament === tournament.id}
+                        open={editingPlayers === tournament.id}
                         onOpenChange={(open) =>
-                          setEditingTournament(open ? tournament.id : null)
+                          setEditingPlayers(open ? tournament.id : null)
                         }
                       >
                         <DialogTrigger asChild>
@@ -123,7 +183,7 @@ export default function Home() {
                             tournamentId={tournament.id}
                             currentPlayers={tournament.tournamentPlayers}
                             onSuccess={() => {
-                              setEditingTournament(null);
+                              setEditingPlayers(null);
                               toast({
                                 title: "Players updated",
                                 description: "Tournament players have been updated successfully.",
@@ -139,6 +199,53 @@ export default function Home() {
             </Card>
           ))}
         </div>
+
+        <Dialog
+          open={editingTournament !== null}
+          onOpenChange={(open) => !open && setEditingTournament(null)}
+        >
+          <DialogContent className="sm:max-w-[500px]">
+            <TournamentForm
+              tournament={tournaments?.find(t => t.id === editingTournament)}
+              onSuccess={() => {
+                setEditingTournament(null);
+                toast({
+                  title: "Tournament updated",
+                  description: "The tournament has been updated successfully.",
+                });
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog
+          open={deletingTournament !== null}
+          onOpenChange={(open) => !open && setDeletingTournament(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete the tournament and all its games.
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (deletingTournament) {
+                    deleteTournament.mutate(deletingTournament);
+                    setDeletingTournament(null);
+                  }
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

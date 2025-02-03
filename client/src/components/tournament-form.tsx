@@ -19,7 +19,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import PlayerSelect from "./player-select";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 
@@ -27,29 +26,43 @@ const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   pointSystem: z.enum(["16", "24", "32"]),
   courts: z.string().transform((val) => parseInt(val)),
-  playerIds: z.array(z.number()).min(4, "At least 4 players are required"),
 });
 
+type Tournament = {
+  id: number;
+  name: string;
+  pointSystem: number;
+  courts: number;
+};
+
 type TournamentFormProps = {
+  tournament?: Tournament;
   onSuccess?: () => void;
 };
 
-export default function TournamentForm({ onSuccess }: TournamentFormProps) {
+export default function TournamentForm({ tournament, onSuccess }: TournamentFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      pointSystem: "16",
-      courts: "1",
-      playerIds: [],
+      name: tournament?.name || "",
+      pointSystem: tournament?.pointSystem.toString() as "16" | "24" | "32" || "16",
+      courts: tournament?.courts.toString() || "1",
     },
   });
 
-  const createTournament = useMutation({
+  const tournamentMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
-      await apiRequest("POST", "/api/tournaments", {
-        ...values,
-        pointSystem: parseInt(values.pointSystem),
-      });
+      if (tournament) {
+        await apiRequest("PATCH", `/api/tournaments/${tournament.id}`, {
+          ...values,
+          pointSystem: parseInt(values.pointSystem),
+        });
+      } else {
+        await apiRequest("POST", "/api/tournaments", {
+          ...values,
+          pointSystem: parseInt(values.pointSystem),
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tournaments"] });
@@ -60,7 +73,7 @@ export default function TournamentForm({ onSuccess }: TournamentFormProps) {
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit((data) => createTournament.mutate(data))}
+        onSubmit={form.handleSubmit((data) => tournamentMutation.mutate(data))}
         className="space-y-6"
       >
         <FormField
@@ -124,29 +137,12 @@ export default function TournamentForm({ onSuccess }: TournamentFormProps) {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="playerIds"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Players (minimum 4)</FormLabel>
-              <FormControl>
-                <PlayerSelect
-                  value={field.value}
-                  onChange={field.onChange}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
         <Button
           type="submit"
           className="w-full"
-          disabled={createTournament.isPending}
+          disabled={tournamentMutation.isPending}
         >
-          Create Tournament
+          {tournament ? "Update Tournament" : "Create Tournament"}
         </Button>
       </form>
     </Form>

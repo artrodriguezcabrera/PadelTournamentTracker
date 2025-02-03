@@ -125,6 +125,70 @@ export function registerRoutes(app: Express): Server {
     res.json(newTournament);
   });
 
+  app.patch("/api/tournaments/:id", async (req, res) => {
+    const tournamentId = parseInt(req.params.id);
+    const { name, pointSystem, courts } = req.body;
+
+    const tournament = await db.query.tournaments.findFirst({
+      where: eq(tournaments.id, tournamentId),
+    });
+
+    if (!tournament) {
+      res.status(404).json({ message: "Tournament not found" });
+      return;
+    }
+
+    if (tournament.isActive) {
+      res.status(400).json({ message: "Cannot modify an active tournament" });
+      return;
+    }
+
+    const updatedTournament = await db
+      .update(tournaments)
+      .set({ name, pointSystem, courts })
+      .where(eq(tournaments.id, tournamentId))
+      .returning();
+
+    res.json(updatedTournament[0]);
+  });
+
+  app.delete("/api/tournaments/:id", async (req, res) => {
+    const tournamentId = parseInt(req.params.id);
+
+    const tournament = await db.query.tournaments.findFirst({
+      where: eq(tournaments.id, tournamentId),
+    });
+
+    if (!tournament) {
+      res.status(404).json({ message: "Tournament not found" });
+      return;
+    }
+
+    if (tournament.isActive) {
+      res.status(400).json({ message: "Cannot delete an active tournament" });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      // Delete tournament players first due to foreign key constraint
+      await tx
+        .delete(tournamentPlayers)
+        .where(eq(tournamentPlayers.tournamentId, tournamentId));
+
+      // Delete tournament games
+      await tx
+        .delete(games)
+        .where(eq(games.tournamentId, tournamentId));
+
+      // Delete tournament
+      await tx
+        .delete(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+    });
+
+    res.json({ message: "Tournament deleted successfully" });
+  });
+
   app.post("/api/tournaments/:id/start", async (req, res) => {
     const tournamentId = parseInt(req.params.id);
     try {
