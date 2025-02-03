@@ -49,23 +49,31 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
 
       // Optimistically update tournament data
       queryClient.setQueryData([`/api/tournaments/${tournamentId}`], (old: any) => {
-        const newGames = old.games.map((game: GameWithPlayers) =>
-          game.id === gameId
-            ? {
-                ...game,
-                team1Score,
-                team2Score,
-                isComplete: true,
-              }
-            : game
-        );
-        return { ...old, games: newGames };
+        if (!old || !old.games) return old;
+
+        // Create a new games array with the updated game, maintaining the original order
+        const newGames = old.games.map((game: GameWithPlayers) => {
+          if (game.id === gameId) {
+            return {
+              ...game,
+              team1Score,
+              team2Score,
+              isComplete: true,
+            };
+          }
+          return game;
+        });
+
+        // Return a new tournament object with all properties preserved
+        return {
+          ...old,
+          games: newGames,
+        };
       });
 
       return { previousTournament };
     },
     onError: (_err, _variables, context) => {
-      // If the mutation fails, revert back to the previous tournament data
       if (context?.previousTournament) {
         queryClient.setQueryData(
           [`/api/tournaments/${tournamentId}`],
@@ -74,7 +82,6 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
       }
     },
     onSettled: () => {
-      // Always refetch after error or success to ensure we're up to date
       queryClient.invalidateQueries({ queryKey: [`/api/tournaments/${tournamentId}`] });
     },
   });
