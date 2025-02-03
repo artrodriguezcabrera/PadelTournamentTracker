@@ -303,7 +303,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
   // Keep generating rounds until we can't make more valid matches
   let consecutiveFailedAttempts = 0;
-  const maxFailedAttempts = 5; // Allow more attempts to find valid combinations
+  const maxFailedAttempts = 5; // Allow some failed attempts before stopping
 
   while (round <= 20 && consecutiveFailedAttempts < maxFailedAttempts) {
     const availablePlayers = new Set(playerIds);
