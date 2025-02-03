@@ -337,12 +337,21 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
   console.log(`Starting generation for ${playerIds.length} players, target ${gamesPerPlayer} games per player`);
 
+  const startTime = Date.now();
+  const maxTimeMs = 5000; // Maximum 5 seconds for generation
+
   // Keep generating rounds until all players have played their required games
   while (true) {
+    // Check for timeout
+    if (Date.now() - startTime > maxTimeMs) {
+      console.log("Generation timed out after 5 seconds");
+      return [];
+    }
+
     console.log(`Generating round ${round}`);
     console.log("Current game counts:", Object.fromEntries(playerGameCounts));
 
-    // Check if all players have played their required games
+    // Check if all players have completed their games
     const allPlayersComplete = Array.from(playerGameCounts.entries()).every(
       ([_, games]) => games >= gamesPerPlayer
     );
@@ -355,64 +364,72 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     // Reset round-specific tracking
     playerGamesInRound.clear();
     const roundMatches: Match[] = [];
+    let retryCount = 0;
+    const maxRetries = 3;
 
-    // Must fill all courts in each round
-    let courtsFilled = 0;
-    for (let court = 1; court <= numCourts; court++) {
-      // Get available players for this game (not played this round and haven't reached max games)
-      const availablePlayers = playerIds.filter(id => 
-        !playerGamesInRound.get(id) && 
-        (playerGameCounts.get(id) || 0) < gamesPerPlayer
-      );
+    while (retryCount < maxRetries) {
+      roundMatches.length = 0;
+      playerGamesInRound.clear();
 
-      if (availablePlayers.length < 4) {
-        console.log(`Not enough available players for court ${court} in round ${round}`);
-        continue;
+      // Must fill all courts in each round
+      let courtsFilled = 0;
+      for (let court = 1; court <= numCourts; court++) {
+        // Get available players for this game
+        const availablePlayers = playerIds.filter(id => 
+          !playerGamesInRound.get(id) && 
+          (playerGameCounts.get(id) || 0) < gamesPerPlayer
+        );
+
+        if (availablePlayers.length < 4) {
+          console.log(`Not enough available players for court ${court} in round ${round}`);
+          continue;
+        }
+
+        // Find valid team combinations
+        const team = findValidTeamCombination(availablePlayers);
+
+        if (team) {
+          console.log(`Found valid team for round ${round}, court ${court}:`, team);
+          // Mark partnerships and update tracking
+          markPairingUsed(team[0], team[1]);
+          markPairingUsed(team[2], team[3]);
+          team.forEach(id => playerGamesInRound.set(id, true));
+          incrementPlayerGames(team);
+
+          roundMatches.push({
+            players: team,
+            round,
+            court,
+          });
+          courtsFilled++;
+        } else {
+          console.log(`Could not find valid team for court ${court} in round ${round}`);
+        }
       }
 
-      // Find valid team combinations
-      const team = findValidTeamCombination(availablePlayers);
-
-      if (team) {
-        console.log(`Found valid team for round ${round}, court ${court}:`, team);
-        // Mark partnerships and update tracking
-        markPairingUsed(team[0], team[1]);
-        markPairingUsed(team[2], team[3]);
-        team.forEach(id => playerGamesInRound.set(id, true));
-        incrementPlayerGames(team);
-
-        roundMatches.push({
-          players: team,
-          round,
-          court,
-        });
-        courtsFilled++;
+      if (courtsFilled === numCourts) {
+        matches.push(...roundMatches);
+        round++;
+        console.log(`Successfully added ${roundMatches.length} matches for round ${round-1}`);
+        break;
       } else {
-        console.log(`Could not find valid team for court ${court} in round ${round}`);
+        console.log(`Failed to fill all courts in round ${round}, retry ${retryCount + 1}/${maxRetries}`);
+        // Reset any partnerships and game counts from this incomplete round
+        roundMatches.forEach(match => {
+          const [p1, p2, p3, p4] = match.players;
+          usedPairings.delete(getPairingKey(p1, p2));
+          usedPairings.delete(getPairingKey(p3, p4));
+          match.players.forEach(id => {
+            playerGameCounts.set(id, (playerGameCounts.get(id) || 0) - 1);
+          });
+        });
+        retryCount++;
       }
     }
 
-    // Only accept rounds where all courts were used
-    if (courtsFilled === numCourts) {
-      matches.push(...roundMatches);
-      round++;
-      console.log(`Successfully added ${roundMatches.length} matches for round ${round-1}`);
-    } else {
-      console.log(`Failed to fill all courts in round ${round}, retrying with different combinations`);
-      // Reset any partnerships and game counts from this incomplete round
-      roundMatches.forEach(match => {
-        const [p1, p2, p3, p4] = match.players;
-        usedPairings.delete(getPairingKey(p1, p2));
-        usedPairings.delete(getPairingKey(p3, p4));
-        match.players.forEach(id => {
-          playerGameCounts.set(id, (playerGameCounts.get(id) || 0) - 1);
-        });
-      });
-    }
-
-    // Prevent infinite loops
-    if (round > 100) {
-      console.log("Could not generate a valid schedule after 100 rounds");
+    // If we couldn't generate a valid round after max retries, return failure
+    if (retryCount === maxRetries) {
+      console.log("Failed to generate valid round after maximum retries");
       return [];
     }
   }
