@@ -19,6 +19,43 @@ export function registerRoutes(app: Express): Server {
     res.json(newPlayer[0]);
   });
 
+  app.patch("/api/players/:id", async (req, res) => {
+    const { name } = req.body;
+    const playerId = parseInt(req.params.id);
+
+    const updatedPlayer = await db
+      .update(players)
+      .set({ name })
+      .where(eq(players.id, playerId))
+      .returning();
+
+    if (updatedPlayer.length === 0) {
+      res.status(404).json({ message: "Player not found" });
+      return;
+    }
+
+    res.json(updatedPlayer[0]);
+  });
+
+  app.delete("/api/players/:id", async (req, res) => {
+    const playerId = parseInt(req.params.id);
+
+    // Check if player is part of any tournament
+    const playerTournaments = await db.query.tournamentPlayers.findMany({
+      where: eq(tournamentPlayers.playerId, playerId),
+    });
+
+    if (playerTournaments.length > 0) {
+      res.status(400).json({ 
+        message: "Cannot delete player that is part of a tournament" 
+      });
+      return;
+    }
+
+    await db.delete(players).where(eq(players.id, playerId));
+    res.json({ message: "Player deleted successfully" });
+  });
+
   // Tournament routes
   app.get("/api/tournaments", async (req, res) => {
     const allTournaments = await db.query.tournaments.findMany({

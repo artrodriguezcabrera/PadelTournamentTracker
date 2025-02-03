@@ -22,22 +22,30 @@ export default function Home() {
       <div className="container mx-auto py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-bold">Padel Tournaments</h1>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button>Create Tournament</Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <TournamentForm
-                onSuccess={() => {
-                  setIsCreateOpen(false);
-                  toast({
-                    title: "Tournament created",
-                    description: "Your tournament has been created successfully.",
-                  });
-                }}
-              />
-            </DialogContent>
-          </Dialog>
+          <div className="flex gap-4">
+            <Button variant="outline" asChild>
+              <a href="/players">
+                <Users className="h-4 w-4 mr-2" />
+                Players
+              </a>
+            </Button>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button>Create Tournament</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <TournamentForm
+                  onSuccess={() => {
+                    setIsCreateOpen(false);
+                    toast({
+                      title: "Tournament created",
+                      description: "Your tournament has been created successfully.",
+                    });
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
