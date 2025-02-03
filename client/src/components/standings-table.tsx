@@ -28,7 +28,10 @@ export default function StandingsTable({
   pointSystem,
 }: StandingsTableProps) {
   // Convert tournament players to the format expected by calculateStandings
-  const formattedPlayers = players.map(tp => tp.player);
+  const formattedPlayers = players.map(tp => ({
+    id: tp.playerId,
+    name: tp.player.name
+  }));
   const standings = calculateStandings(games, formattedPlayers, pointSystem);
 
   // Sort standings by total points descending
