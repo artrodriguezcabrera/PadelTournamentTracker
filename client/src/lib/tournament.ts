@@ -11,23 +11,29 @@ type Standing = {
 };
 
 export function calculateStandings(
-  games: Game[],
-  players: Player[],
+  games: Game[] | undefined,
+  players: Player[] | undefined,
   pointSystem: number
 ): Standing[] {
+  if (!games || !players) {
+    return [];
+  }
+
   // Initialize standings for all players
   const standings: Record<number, Standing> = {};
 
   players.forEach((p) => {
-    standings[p.id] = {
-      playerId: p.id,
-      playerName: p.name,
-      gamesPlayed: 0,
-      wins: 0,
-      ties: 0,
-      losses: 0,
-      points: 0,
-    };
+    if (p && p.id) {
+      standings[p.id] = {
+        playerId: p.id,
+        playerName: p.name,
+        gamesPlayed: 0,
+        wins: 0,
+        ties: 0,
+        losses: 0,
+        points: 0,
+      };
+    }
   });
 
   // Process completed games
@@ -43,7 +49,7 @@ export function calculateStandings(
 
     // Update games played
     [...team1Players, ...team2Players].forEach((playerId) => {
-      if (standings[playerId]) {
+      if (playerId && standings[playerId]) {
         standings[playerId].gamesPlayed++;
       }
     });
@@ -55,13 +61,13 @@ export function calculateStandings(
     if (team1Score > team2Score) {
       // Team 1 wins
       team1Players.forEach((playerId) => {
-        if (standings[playerId]) {
+        if (playerId && standings[playerId]) {
           standings[playerId].wins++;
           standings[playerId].points += team1Score;
         }
       });
       team2Players.forEach((playerId) => {
-        if (standings[playerId]) {
+        if (playerId && standings[playerId]) {
           standings[playerId].losses++;
           standings[playerId].points += team2Score;
         }
@@ -69,13 +75,13 @@ export function calculateStandings(
     } else if (team1Score < team2Score) {
       // Team 2 wins
       team1Players.forEach((playerId) => {
-        if (standings[playerId]) {
+        if (playerId && standings[playerId]) {
           standings[playerId].losses++;
           standings[playerId].points += team1Score;
         }
       });
       team2Players.forEach((playerId) => {
-        if (standings[playerId]) {
+        if (playerId && standings[playerId]) {
           standings[playerId].wins++;
           standings[playerId].points += team2Score;
         }
@@ -83,7 +89,7 @@ export function calculateStandings(
     } else {
       // Tie
       [...team1Players, ...team2Players].forEach((playerId) => {
-        if (standings[playerId]) {
+        if (playerId && standings[playerId]) {
           standings[playerId].ties++;
           standings[playerId].points += team1Score;
         }

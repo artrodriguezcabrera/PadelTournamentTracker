@@ -8,12 +8,29 @@ import StandingsTable from "@/components/standings-table";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft } from "lucide-react";
+import { type Game, type Player } from "@db/schema";
+
+type TournamentResponse = {
+  id: number;
+  name: string;
+  pointSystem: number;
+  isActive: boolean;
+  tournamentPlayers: Array<{
+    player: Player;
+  }>;
+  games: Array<Game & {
+    player1: Player;
+    player2: Player;
+    player3: Player;
+    player4: Player;
+  }>;
+};
 
 export default function Tournament() {
   const { id } = useParams();
   const { toast } = useToast();
 
-  const { data: tournament, isLoading } = useQuery({
+  const { data: tournament, isLoading } = useQuery<TournamentResponse>({
     queryKey: [`/api/tournaments/${id}`],
   });
 
@@ -36,6 +53,8 @@ export default function Tournament() {
   if (!tournament) {
     return <div>Tournament not found</div>;
   }
+
+  const players = tournament.tournamentPlayers.map(tp => tp.player);
 
   return (
     <div className="min-h-screen bg-background">
@@ -76,7 +95,7 @@ export default function Tournament() {
             <TabsContent value="standings">
               <StandingsTable
                 games={tournament.games}
-                players={tournament.players}
+                players={players}
                 pointSystem={tournament.pointSystem}
               />
             </TabsContent>
