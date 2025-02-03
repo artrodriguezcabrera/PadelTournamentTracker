@@ -143,8 +143,15 @@ export function registerRoutes(app: Express): Server {
       return;
     }
 
-    // Generate all possible game combinations with court assignments
-    const playerIds = tournamentData.tournamentPlayers.map(tp => tp.playerId);
+    // Filter out any null values and ensure we have valid player IDs
+    const playerIds = tournamentData.tournamentPlayers
+      .map(tp => tp.playerId)
+      .filter((id): id is number => id !== null);
+
+    if (playerIds.length < 4) {
+      res.status(400).json({ message: "Not enough players to start tournament" });
+      return;
+    }
 
     try {
       const gameMatches = generateGameMatchesWithCourts(playerIds, tournamentData.courts);
@@ -254,34 +261,34 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     if (playerIds.length < 4) {
       throw new Error("Not enough players to generate matches");
     }
-
+  
     const matches: Match[] = [];
     let round = 1;
     const usedPairings = new Set<string>();
     const playerGameCounts = new Map<number, number>();
-
+  
     // Initialize game counts for all players
     playerIds.forEach(id => playerGameCounts.set(id, 0));
-
+  
     // Function to check if a pairing has been used
     const hasPairingBeenUsed = (player1: number, player2: number) => {
       const key = [player1, player2].sort((a, b) => a - b).join(',');
       return usedPairings.has(key);
     };
-
+  
     // Function to mark a pairing as used
     const markPairingUsed = (player1: number, player2: number) => {
       const key = [player1, player2].sort((a, b) => a - b).join(',');
       usedPairings.add(key);
     };
-
+  
     // Function to increment game count for players
     const incrementPlayerGames = (players: number[]) => {
       players.forEach(playerId => {
         playerGameCounts.set(playerId, (playerGameCounts.get(playerId) || 0) + 1);
       });
     };
-
+  
     // Function to check if adding these players would create imbalance
     const wouldCreateImbalance = (players: number[]) => {
       const currentMax = Math.max(...Array.from(playerGameCounts.values()));
@@ -291,46 +298,46 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
         (playerGameCounts.get(playerId) || 0) + 1 > currentMin + 1
       );
     };
-
+  
     // Function to check if we can create a complete round
     const canCreateCompleteRound = (availablePlayers: Set<number>) => {
       // For a complete round, we need enough players for all courts
       const playersNeeded = numCourts * 4;
       return availablePlayers.size >= playersNeeded;
     };
-
+  
     // Keep generating rounds until we can't make more balanced matches
     while (round <= 10) { // Limit to 10 rounds as safety
       const availablePlayers = new Set(playerIds);
       const roundMatches: Match[] = [];
       let validRound = false;
-
+  
       // Only proceed with this round if we can make it complete
       if (!canCreateCompleteRound(availablePlayers)) {
         break;
       }
-
+  
       // For each court in this round
       for (let court = 1; court <= numCourts && availablePlayers.size >= 4; court++) {
         let validMatch = false;
-
+  
         // Try to find a valid match with unused pairings
         for (let attempts = 0; attempts < 20 && !validMatch; attempts++) {
           // Randomly select 4 players
           const selectedPlayers = Array.from(availablePlayers)
             .sort(() => Math.random() - 0.5)
             .slice(0, 4);
-
+  
           if (selectedPlayers.length === 4) {
             // Check if this match would create imbalance
             if (wouldCreateImbalance(selectedPlayers)) {
               continue;
             }
-
+  
             // Create teams: (0,1) vs (2,3)
             const team1HasPlayedTogether = hasPairingBeenUsed(selectedPlayers[0], selectedPlayers[1]);
             const team2HasPlayedTogether = hasPairingBeenUsed(selectedPlayers[2], selectedPlayers[3]);
-
+  
             // Allow the match if at least one team has not played together
             if (!team1HasPlayedTogether || !team2HasPlayedTogether) {
               if (!team1HasPlayedTogether) {
@@ -340,10 +347,10 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
                 markPairingUsed(selectedPlayers[2], selectedPlayers[3]);
               }
               incrementPlayerGames(selectedPlayers);
-
+  
               // Remove these players from available pool
               selectedPlayers.forEach(p => availablePlayers.delete(p));
-
+  
               roundMatches.push({
                 players: selectedPlayers,
                 round,
@@ -355,7 +362,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
           }
         }
       }
-
+  
       // If we couldn't generate valid matches for this round, we're done
       if (!validRound || roundMatches.length < numCourts) {
           // Remove the incomplete round's matches from player counts
@@ -366,17 +373,17 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
         });
         break;
       }
-
+  
       matches.push(...roundMatches);
       round++;
     }
-
+  
     // Verify that all players have the same number of games
     const gameCounts = new Set(Array.from(playerGameCounts.values()));
     if (gameCounts.size > 1) {
       // If games are not balanced, return no matches to trigger regeneration
       return [];
     }
-
+  
     return matches;
   }
