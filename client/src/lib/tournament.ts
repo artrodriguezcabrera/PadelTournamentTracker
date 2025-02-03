@@ -54,44 +54,46 @@ export function calculateStandings(
       }
     });
 
-    const team1Score = game.team1Score;
-    const team2Score = game.team2Score;
+    // Calculate points based on the point system and score ratio
+    const team1Points = Math.round((game.team1Score / (game.team1Score + game.team2Score)) * pointSystem);
+    const team2Points = pointSystem - team1Points;
 
-    // Update wins, ties, losses
-    if (team1Score > team2Score) {
+    // Update wins, ties, losses and points
+    if (game.team1Score > game.team2Score) {
       // Team 1 wins
       team1Players.forEach((playerId) => {
         if (playerId && standings[playerId]) {
           standings[playerId].wins++;
-          standings[playerId].points += team1Score;
+          standings[playerId].points += team1Points;
         }
       });
       team2Players.forEach((playerId) => {
         if (playerId && standings[playerId]) {
           standings[playerId].losses++;
-          standings[playerId].points += team2Score;
+          standings[playerId].points += team2Points;
         }
       });
-    } else if (team1Score < team2Score) {
+    } else if (game.team1Score < game.team2Score) {
       // Team 2 wins
       team1Players.forEach((playerId) => {
         if (playerId && standings[playerId]) {
           standings[playerId].losses++;
-          standings[playerId].points += team1Score;
+          standings[playerId].points += team1Points;
         }
       });
       team2Players.forEach((playerId) => {
         if (playerId && standings[playerId]) {
           standings[playerId].wins++;
-          standings[playerId].points += team2Score;
+          standings[playerId].points += team2Points;
         }
       });
     } else {
-      // Tie
+      // Tie - split points evenly
+      const tiePoints = pointSystem / 2;
       [...team1Players, ...team2Players].forEach((playerId) => {
         if (playerId && standings[playerId]) {
           standings[playerId].ties++;
-          standings[playerId].points += team1Score;
+          standings[playerId].points += tiePoints;
         }
       });
     }
