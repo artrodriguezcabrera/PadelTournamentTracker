@@ -303,7 +303,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
   // Keep generating rounds until we can't make more valid matches
   let consecutiveFailedAttempts = 0;
-  const maxFailedAttempts = 5; // Increased to allow more attempts for balance
+  const maxFailedAttempts = 5; // Allow more attempts to find valid combinations
 
   while (round <= 20 && consecutiveFailedAttempts < maxFailedAttempts) {
     const availablePlayers = new Set(playerIds);
@@ -329,7 +329,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
             return Math.random() - 0.5;
           });
 
-        // Take the first 4 players who haven't played too many games
+        // Take the first 4 players
         const selectedPlayers = playerArray.slice(0, 4);
 
         if (selectedPlayers.length === 4) {
@@ -379,10 +379,23 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     }
 
     // Check if we have achieved all possible pairings
-    const totalPlayers = playerIds.length;
-    const maxPossiblePairings = (totalPlayers * (totalPlayers - 1)) / 2; // n(n-1)/2
-    if (usedPairings.size >= maxPossiblePairings) {
-      break; // We've achieved all possible pairings
+    const totalPairs = new Set<string>();
+    for (let i = 0; i < playerIds.length; i++) {
+      for (let j = i + 1; j < playerIds.length; j++) {
+        totalPairs.add([playerIds[i], playerIds[j]].sort((a, b) => a - b).join(','));
+      }
+    }
+
+    // If we've used all possible pairings, we can stop
+    let allPairingsUsed = true;
+    totalPairs.forEach(pair => {
+      if (!usedPairings.has(pair)) {
+        allPairingsUsed = false;
+      }
+    });
+
+    if (allPairingsUsed) {
+      break;
     }
   }
 
