@@ -130,6 +130,48 @@ export function registerRoutes(app: Express): Server {
     res.json({ message: "Tournament started" });
   });
 
+    app.patch("/api/tournaments/:id/players", async (req, res) => {
+        const tournamentId = parseInt(req.params.id);
+        const { playerIds } = req.body;
+
+        // Ensure we have at least 4 players
+        if (playerIds.length < 4) {
+            res.status(400).json({ message: "At least 4 players are required for a tournament" });
+            return;
+        }
+
+        const tournament = await db.query.tournaments.findFirst({
+            where: eq(tournaments.id, tournamentId),
+        });
+
+        if (!tournament) {
+            res.status(404).json({ message: "Tournament not found" });
+            return;
+        }
+
+        if (tournament.isActive) {
+            res.status(400).json({ message: "Cannot modify players in an active tournament" });
+            return;
+        }
+
+        await db.transaction(async (tx) => {
+            // Delete existing tournament players
+            await tx
+              .delete(tournamentPlayers)
+              .where(eq(tournamentPlayers.tournamentId, tournamentId));
+
+            // Insert new tournament players
+            await tx.insert(tournamentPlayers).values(
+                playerIds.map((playerId: number) => ({
+                    tournamentId,
+                    playerId,
+                }))
+            );
+        });
+
+        res.json({ message: "Tournament players updated successfully" });
+    });
+
   app.post("/api/games/:id/score", async (req, res) => {
     const { team1Score, team2Score } = req.body;
     const gameId = parseInt(req.params.id);
