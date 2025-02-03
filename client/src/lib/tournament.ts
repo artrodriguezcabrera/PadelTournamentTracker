@@ -8,11 +8,12 @@ type Standing = {
   ties: number;
   losses: number;
   points: number;
+  pointDifference: number;
 };
 
 export function calculateStandings(
   games: Game[] | undefined,
-  players: Player[] | undefined,
+  players: { id: number; name: string }[] | undefined,
   pointSystem: number
 ): Standing[] {
   if (!games || !players) {
@@ -32,6 +33,7 @@ export function calculateStandings(
         ties: 0,
         losses: 0,
         points: 0,
+        pointDifference: 0,
       };
     }
   });
@@ -58,19 +60,21 @@ export function calculateStandings(
     const team1Points = Math.round((game.team1Score / (game.team1Score + game.team2Score)) * pointSystem);
     const team2Points = pointSystem - team1Points;
 
-    // Update wins, ties, losses and points
+    // Update wins, ties, losses, points, and point difference
     if (game.team1Score > game.team2Score) {
       // Team 1 wins
       team1Players.forEach((playerId) => {
         if (playerId && standings[playerId]) {
           standings[playerId].wins++;
           standings[playerId].points += team1Points;
+          standings[playerId].pointDifference += (game.team1Score - game.team2Score);
         }
       });
       team2Players.forEach((playerId) => {
         if (playerId && standings[playerId]) {
           standings[playerId].losses++;
           standings[playerId].points += team2Points;
+          standings[playerId].pointDifference += (game.team2Score - game.team1Score);
         }
       });
     } else if (game.team1Score < game.team2Score) {
@@ -79,12 +83,14 @@ export function calculateStandings(
         if (playerId && standings[playerId]) {
           standings[playerId].losses++;
           standings[playerId].points += team1Points;
+          standings[playerId].pointDifference += (game.team1Score - game.team2Score);
         }
       });
       team2Players.forEach((playerId) => {
         if (playerId && standings[playerId]) {
           standings[playerId].wins++;
           standings[playerId].points += team2Points;
+          standings[playerId].pointDifference += (game.team2Score - game.team1Score);
         }
       });
     } else {
@@ -94,6 +100,7 @@ export function calculateStandings(
         if (playerId && standings[playerId]) {
           standings[playerId].ties++;
           standings[playerId].points += tiePoints;
+          // No point difference in a tie
         }
       });
     }

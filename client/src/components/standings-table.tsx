@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { calculateStandings } from "@/lib/tournament";
 import { Trophy, Medal } from "lucide-react";
 import { type Game, type Player } from "@db/schema";
+import { cn } from "@/lib/utils";
 
 type TournamentPlayer = {
   playerId: number;
@@ -48,6 +49,7 @@ export default function StandingsTable({
             <TableHead className="text-center">Won</TableHead>
             <TableHead className="text-center">Tied</TableHead>
             <TableHead className="text-center">Lost</TableHead>
+            <TableHead className="text-center">+/-</TableHead>
             <TableHead className="text-center">Points</TableHead>
           </TableRow>
         </TableHeader>
@@ -77,6 +79,13 @@ export default function StandingsTable({
               </TableCell>
               <TableCell className="text-center text-red-600">
                 {standing.losses}
+              </TableCell>
+              <TableCell className={cn(
+                "text-center font-medium",
+                standing.pointDifference > 0 ? "text-green-600" : 
+                standing.pointDifference < 0 ? "text-red-600" : ""
+              )}>
+                {standing.pointDifference > 0 ? "+" : ""}{standing.pointDifference}
               </TableCell>
               <TableCell className="text-center font-bold">
                 {standing.points}
