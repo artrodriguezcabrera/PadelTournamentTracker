@@ -103,7 +103,7 @@ export default function TournamentForm({ onSuccess }: TournamentFormProps) {
           name="playerIds"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Players</FormLabel>
+              <FormLabel>Players (minimum 4)</FormLabel>
               <FormControl>
                 <PlayerSelect
                   value={field.value}

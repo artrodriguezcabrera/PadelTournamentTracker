@@ -63,6 +63,12 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/tournaments", async (req, res) => {
     const { name, pointSystem, playerIds } = req.body;
 
+    // Ensure we have at least 4 players
+    if (playerIds.length < 4) {
+      res.status(400).json({ message: "At least 4 players are required for a tournament" });
+      return;
+    }
+
     const newTournament = await db.transaction(async (tx) => {
       const [tournament] = await tx
         .insert(tournaments)
@@ -145,17 +151,25 @@ export function registerRoutes(app: Express): Server {
 }
 
 function generateGameMatches(playerIds: number[]): number[][] {
+  if (playerIds.length < 4) {
+    throw new Error("Not enough players to generate matches");
+  }
+
   const matches: number[][] = [];
   const n = playerIds.length;
 
+  // Generate all possible combinations of 4 players
+  // This ensures each player gets to play with and against every other player
   for (let i = 0; i < n - 3; i++) {
     for (let j = i + 1; j < n - 2; j++) {
       for (let k = j + 1; k < n - 1; k++) {
         for (let l = k + 1; l < n; l++) {
-          // Create two teams: (i,j) vs (k,l)
+          // Create all possible team combinations for these 4 players
+          // (i,j) vs (k,l)
           matches.push([playerIds[i], playerIds[j], playerIds[k], playerIds[l]]);
-          // Also add (i,k) vs (j,l) and (i,l) vs (j,k) combinations
+          // (i,k) vs (j,l)
           matches.push([playerIds[i], playerIds[k], playerIds[j], playerIds[l]]);
+          // (i,l) vs (j,k)
           matches.push([playerIds[i], playerIds[l], playerIds[j], playerIds[k]]);
         }
       }
