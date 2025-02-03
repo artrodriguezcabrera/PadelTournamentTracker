@@ -35,8 +35,19 @@ export default function StandingsTable({
   }));
   const standings = calculateStandings(games, formattedPlayers, pointSystem);
 
-  // Sort standings by total points descending
-  const sortedStandings = [...standings].sort((a, b) => b.points - a.points);
+  // Sort standings by points first, then wins, then point difference
+  const sortedStandings = [...standings].sort((a, b) => {
+    // Compare points first
+    if (b.points !== a.points) {
+      return b.points - a.points;
+    }
+    // If points are equal, compare wins
+    if (b.wins !== a.wins) {
+      return b.wins - a.wins;
+    }
+    // If wins are equal, compare point difference
+    return b.pointDifference - a.pointDifference;
+  });
 
   return (
     <Card>
