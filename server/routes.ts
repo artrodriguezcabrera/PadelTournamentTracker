@@ -127,74 +127,91 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/tournaments/:id/start", async (req, res) => {
     const tournamentId = parseInt(req.params.id);
-    const tournamentData = await db.query.tournaments.findFirst({
-      where: eq(tournaments.id, tournamentId),
-      with: {
-        tournamentPlayers: {
-          with: {
-            player: true,
+    try {
+      const tournamentData = await db.query.tournaments.findFirst({
+        where: eq(tournaments.id, tournamentId),
+        with: {
+          tournamentPlayers: {
+            with: {
+              player: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!tournamentData) {
-      res.status(404).json({ message: "Tournament not found" });
-      return;
-    }
-
-    // Filter out any null values and ensure we have valid player IDs
-    const playerIds = tournamentData.tournamentPlayers
-      .map(tp => tp.playerId)
-      .filter((id): id is number => id !== null);
-
-    if (playerIds.length < 4) {
-      res.status(400).json({ message: "Not enough players to start tournament" });
-      return;
-    }
-
-    try {
-      const gameMatches = generateGameMatchesWithCourts(playerIds, tournamentData.courts);
-      console.log("Generated matches:", gameMatches); // Add logging
-
-      if (!gameMatches || gameMatches.length === 0) {
-        res.status(400).json({ message: "Could not generate valid game matches. Please ensure you have enough players and try again." });
-        return;
+      if (!tournamentData) {
+        return res.status(404).json({ message: "Tournament not found" });
       }
 
-      await db.transaction(async (tx) => {
-        // Set tournament to active
-        await tx
-          .update(tournaments)
-          .set({ isActive: true })
-          .where(eq(tournaments.id, tournamentId));
+      // Filter out any null values and ensure we have valid player IDs
+      const playerIds = tournamentData.tournamentPlayers
+        .map(tp => tp.playerId)
+        .filter((id): id is number => id !== null);
 
-        // Create games for each match
-        const gameValues = gameMatches.map(match => ({
-          tournamentId,
-          roundNumber: match.round,
-          courtNumber: match.court,
-          player1Id: match.players[0],
-          player2Id: match.players[1],
-          player3Id: match.players[2],
-          player4Id: match.players[3],
-        }));
+      if (playerIds.length < 4) {
+        return res.status(400).json({ 
+          message: "Not enough players to start tournament. Minimum 4 players required.",
+          currentPlayers: playerIds.length
+        });
+      }
 
-        console.log("Creating games:", gameValues); // Add logging
+      console.log(`Starting tournament ${tournamentId} with ${playerIds.length} players`);
+      console.log("Player IDs:", playerIds);
 
-        if (gameValues.length > 0) {
-          await tx.insert(games).values(gameValues);
+      try {
+        const gameMatches = generateGameMatchesWithCourts(playerIds, tournamentData.courts);
+
+        if (!gameMatches || gameMatches.length === 0) {
+          return res.status(400).json({ 
+            message: "Could not generate valid game matches. Please ensure you have enough players and try again.",
+            error: "No valid matches could be generated",
+            playerCount: playerIds.length,
+            courts: tournamentData.courts
+          });
         }
-      });
 
-      res.json({
-        message: "Tournament started successfully",
-        gamesGenerated: gameMatches.length,
-        games: gameMatches
-      });
+        await db.transaction(async (tx) => {
+          // Set tournament to active
+          await tx
+            .update(tournaments)
+            .set({ isActive: true })
+            .where(eq(tournaments.id, tournamentId));
+
+          // Create games for each match
+          const gameValues = gameMatches.map(match => ({
+            tournamentId,
+            roundNumber: match.round,
+            courtNumber: match.court,
+            player1Id: match.players[0],
+            player2Id: match.players[1],
+            player3Id: match.players[2],
+            player4Id: match.players[3],
+          }));
+
+          console.log("Creating games:", gameValues);
+
+          if (gameValues.length > 0) {
+            await tx.insert(games).values(gameValues);
+          }
+        });
+
+        return res.json({
+          message: "Tournament started successfully",
+          gamesGenerated: gameMatches.length,
+          rounds: Math.max(...gameMatches.map(m => m.round)),
+          games: gameMatches
+        });
+      } catch (error) {
+        console.error("Error generating game matches:", error);
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Failed to generate game matches",
+          playerCount: playerIds.length,
+          courts: tournamentData.courts
+        });
+      }
     } catch (error) {
       console.error("Error starting tournament:", error);
-      res.status(500).json({
+      return res.status(500).json({
         message: "Failed to start tournament",
         error: error instanceof Error ? error.message : "Unknown error"
       });
@@ -275,141 +292,110 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   }
 
   const matches: Match[] = [];
-  const gamesPerPlayer = 8; // Each player must play 8 games
+  const playerGamesCount = new Map<number, number>();
+  const usedPairings = new Set<string>();
   let round = 1;
 
-  // Initialize tracking structures
-  const usedPairings = new Set<string>();
-  const playerGamesInRound = new Map<number, boolean>();
-  const playerGameCounts = new Map<number, number>();
-
   // Initialize game counts
-  playerIds.forEach(id => playerGameCounts.set(id, 0));
+  playerIds.forEach(id => playerGamesCount.set(id, 0));
 
-  // Track partnerships
+  // Get pairing key for tracking partnerships
   const getPairingKey = (p1: number, p2: number) =>
     [p1, p2].sort((a, b) => a - b).join(',');
 
-  const hasPairingBeenUsed = (p1: number, p2: number) =>
-    usedPairings.has(getPairingKey(p1, p2));
-
-  const markPairingUsed = (p1: number, p2: number) =>
-    usedPairings.add(getPairingKey(p1, p2));
-
-  const incrementPlayerGames = (players: number[]) => {
-    players.forEach(id => {
-      playerGameCounts.set(id, (playerGameCounts.get(id) || 0) + 1);
-    });
-  };
-
-  const findValidTeamCombination = (availablePlayers: number[]): number[] | null => {
-    // Sort players by number of games played
-    const players = [...availablePlayers].sort((a, b) =>
-      (playerGameCounts.get(a) || 0) - (playerGameCounts.get(b) || 0)
-    );
-
-    // Try to find valid combinations prioritizing players with fewer games
-    for (let i = 0; i < players.length - 3; i++) {
-      const player1Games = playerGameCounts.get(players[i]) || 0;
-      if (player1Games >= gamesPerPlayer) continue;
-
-      for (let j = i + 1; j < players.length - 2; j++) {
-        const player2Games = playerGameCounts.get(players[j]) || 0;
-        if (player2Games >= gamesPerPlayer) continue;
-        if (hasPairingBeenUsed(players[i], players[j])) continue;
-
-        for (let k = j + 1; k < players.length - 1; k++) {
-          const player3Games = playerGameCounts.get(players[k]) || 0;
-          if (player3Games >= gamesPerPlayer) continue;
-
-          for (let l = k + 1; l < players.length; l++) {
-            const player4Games = playerGameCounts.get(players[l]) || 0;
-            if (player4Games >= gamesPerPlayer) continue;
-            if (!hasPairingBeenUsed(players[k], players[l])) {
-              return [players[i], players[j], players[k], players[l]];
-            }
-          }
-        }
-      }
-    }
-    return null;
-  };
-
-  console.log(`Starting generation for ${playerIds.length} players, target ${gamesPerPlayer} games per player`);
-
-  const startTime = Date.now();
-  const maxTimeMs = 5000; // Maximum 5 seconds for generation
-
-  // Keep generating rounds until all players have played their required games
+  // Try to create matches until all players have played 8 games
   while (true) {
-    // Check for timeout
-    if (Date.now() - startTime > maxTimeMs) {
-      console.log("Generation timed out after 5 seconds");
-      return [];
-    }
+    // Check if all players have played 8 games
+    const allPlayersHaveEightGames = Array.from(playerGamesCount.values())
+      .every(count => count >= 8);
 
-    console.log(`Generating round ${round}`);
-    console.log("Current game counts:", Object.fromEntries(playerGameCounts));
-
-    // Check if all players have completed their games
-    const allPlayersComplete = Array.from(playerGameCounts.entries()).every(
-      ([_, games]) => games >= gamesPerPlayer
-    );
-
-    if (allPlayersComplete) {
-      console.log("All players have completed their required games");
+    if (allPlayersHaveEightGames) {
+      console.log("All players have completed 8 games");
       break;
     }
 
-    // Reset round-specific tracking
-    playerGamesInRound.clear();
-    const roundMatches: Match[] = [];
-    let retryCount = 0;
-    const maxRetries = 3;
+    // Get players who haven't played 8 games yet, sorted by games played
+    const availablePlayers = playerIds
+      .filter(id => (playerGamesCount.get(id) || 0) < 8)
+      .sort((a, b) => (playerGamesCount.get(a) || 0) - (playerGamesCount.get(b) || 0));
 
-    while (retryCount < maxRetries) {
-      roundMatches.length = 0;
-      playerGamesInRound.clear();
+    if (availablePlayers.length < 4) {
+      console.log("Not enough players available for next game");
+      break;
+    }
 
-      // Allow partial court usage
-      for (let court = 1; court <= numCourts; court++) {
-        const availablePlayers = playerIds.filter(id =>
-          !playerGamesInRound.get(id) && (playerGameCounts.get(id) || 0) < gamesPerPlayer
-        );
+    // Create matches for this round
+    for (let court = 1; court <= numCourts && availablePlayers.length >= 4; court++) {
+      // Find players for this match prioritizing those who've played fewer games
+      let matchPlayers: number[] = [];
 
-        if (availablePlayers.length >= 4) {
-          const team = findValidTeamCombination(availablePlayers);
-          if (team) {
-            console.log(`Found valid team for round ${round}, court ${court}:`, team);
-            markPairingUsed(team[0], team[1]);
-            markPairingUsed(team[2], team[3]);
-            team.forEach(id => playerGamesInRound.set(id, true));
-            incrementPlayerGames(team);
-            roundMatches.push({ players: team, round, court });
+      // Try to find team 1 (first partnership)
+      for (let i = 0; i < availablePlayers.length - 1; i++) {
+        for (let j = i + 1; j < availablePlayers.length; j++) {
+          const p1 = availablePlayers[i];
+          const p2 = availablePlayers[j];
+
+          // Skip if this partnership has already played together
+          if (!usedPairings.has(getPairingKey(p1, p2))) {
+            matchPlayers = [p1, p2];
+            break;
           }
         }
+        if (matchPlayers.length === 2) break;
       }
 
-      if (roundMatches.length > 0) {
-        matches.push(...roundMatches);
-        round++;
-        console.log(`Successfully added ${roundMatches.length} matches for round ${round - 1}`);
-        break;
-      } else {
-        console.log(`Failed to fill any courts in round ${round}, retry ${retryCount + 1}/${maxRetries}`);
-        retryCount++;
+      // If we couldn't find a valid first partnership, skip this court
+      if (matchPlayers.length !== 2) continue;
+
+      // Find team 2 (second partnership)
+      const remainingPlayers = availablePlayers.filter(p => !matchPlayers.includes(p));
+      for (let i = 0; i < remainingPlayers.length - 1; i++) {
+        for (let j = i + 1; j < remainingPlayers.length; j++) {
+          const p3 = remainingPlayers[i];
+          const p4 = remainingPlayers[j];
+
+          // Skip if this partnership has already played together
+          if (!usedPairings.has(getPairingKey(p3, p4))) {
+            matchPlayers.push(p3, p4);
+            break;
+          }
+        }
+        if (matchPlayers.length === 4) break;
+      }
+
+      // If we found 4 players, create the match
+      if (matchPlayers.length === 4) {
+        // Record the partnerships
+        usedPairings.add(getPairingKey(matchPlayers[0], matchPlayers[1]));
+        usedPairings.add(getPairingKey(matchPlayers[2], matchPlayers[3]));
+
+        // Update game counts
+        matchPlayers.forEach(id => {
+          playerGamesCount.set(id, (playerGamesCount.get(id) || 0) + 1);
+        });
+
+        // Add the match
+        matches.push({
+          players: matchPlayers,
+          round,
+          court,
+        });
       }
     }
 
-    // If we couldn't generate a valid round after max retries, continue to the next round
-    if (retryCount === maxRetries) {
-      console.log("Failed to generate valid round after maximum retries.  Continuing to next round.");
-      round++;
+    // Move to next round
+    round++;
+
+    // Safety check to prevent infinite loops
+    if (round > 50) {
+      console.log("Could not generate a complete schedule after 50 rounds");
+      if (matches.length > 0) {
+        // Return partial schedule if we have some matches
+        return matches;
+      }
+      throw new Error("Could not generate a valid schedule");
     }
   }
-
-  console.log("Final game counts:", Object.fromEntries(playerGameCounts));
-  console.log(`Generation complete. Total matches: ${matches.length}`);
 
   return matches;
 }
