@@ -275,7 +275,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   }
 
   const matches: Match[] = [];
-  const requiredRounds = playerIds.length - 1; // N-1 rounds required
+  const gamesPerPlayer = 8; // Each player must play 8 games
   let round = 1;
 
   // Initialize tracking structures
@@ -308,13 +308,23 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       (playerGameCounts.get(a) || 0) - (playerGameCounts.get(b) || 0)
     );
 
-    // Try to find valid combinations
+    // Try to find valid combinations prioritizing players with fewer games
     for (let i = 0; i < players.length - 3; i++) {
+      const player1Games = playerGameCounts.get(players[i]) || 0;
+      if (player1Games >= gamesPerPlayer) continue;
+
       for (let j = i + 1; j < players.length - 2; j++) {
+        const player2Games = playerGameCounts.get(players[j]) || 0;
+        if (player2Games >= gamesPerPlayer) continue;
         if (hasPairingBeenUsed(players[i], players[j])) continue;
 
         for (let k = j + 1; k < players.length - 1; k++) {
+          const player3Games = playerGameCounts.get(players[k]) || 0;
+          if (player3Games >= gamesPerPlayer) continue;
+
           for (let l = k + 1; l < players.length; l++) {
+            const player4Games = playerGameCounts.get(players[l]) || 0;
+            if (player4Games >= gamesPerPlayer) continue;
             if (!hasPairingBeenUsed(players[k], players[l])) {
               return [players[i], players[j], players[k], players[l]];
             }
@@ -325,20 +335,35 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     return null;
   };
 
-  console.log(`Starting generation for ${playerIds.length} players, requiring ${requiredRounds} rounds`);
+  console.log(`Starting generation for ${playerIds.length} players, target ${gamesPerPlayer} games per player`);
 
-  // Generate rounds until we reach N-1 rounds
-  while (round <= requiredRounds) {
+  // Keep generating rounds until all players have played their required games
+  while (true) {
     console.log(`Generating round ${round}`);
+    console.log("Current game counts:", Object.fromEntries(playerGameCounts));
+
+    // Check if all players have played their required games
+    const allPlayersComplete = Array.from(playerGameCounts.entries()).every(
+      ([_, games]) => games >= gamesPerPlayer
+    );
+
+    if (allPlayersComplete) {
+      console.log("All players have completed their required games");
+      break;
+    }
 
     // Reset round-specific tracking
     playerGamesInRound.clear();
     const roundMatches: Match[] = [];
 
-    // For each court in this round
+    // Must fill all courts in each round
+    let courtsFilled = 0;
     for (let court = 1; court <= numCourts; court++) {
-      // Get available players for this game
-      const availablePlayers = playerIds.filter(id => !playerGamesInRound.get(id));
+      // Get available players for this game (not played this round and haven't reached max games)
+      const availablePlayers = playerIds.filter(id => 
+        !playerGamesInRound.get(id) && 
+        (playerGameCounts.get(id) || 0) < gamesPerPlayer
+      );
 
       if (availablePlayers.length < 4) {
         console.log(`Not enough available players for court ${court} in round ${round}`);
@@ -361,24 +386,60 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
           round,
           court,
         });
+        courtsFilled++;
       } else {
         console.log(`Could not find valid team for court ${court} in round ${round}`);
       }
     }
 
-    // If we made matches this round, add them and continue
-    if (roundMatches.length > 0) {
+    // Only accept rounds where all courts were used
+    if (courtsFilled === numCourts) {
       matches.push(...roundMatches);
       round++;
       console.log(`Successfully added ${roundMatches.length} matches for round ${round-1}`);
     } else {
-      console.log(`Failed to generate any matches for round ${round}`);
-      return []; // If we can't make any matches in a round, start over
+      console.log(`Failed to fill all courts in round ${round}, retrying with different combinations`);
+      // Reset any partnerships and game counts from this incomplete round
+      roundMatches.forEach(match => {
+        const [p1, p2, p3, p4] = match.players;
+        usedPairings.delete(getPairingKey(p1, p2));
+        usedPairings.delete(getPairingKey(p3, p4));
+        match.players.forEach(id => {
+          playerGameCounts.set(id, (playerGameCounts.get(id) || 0) - 1);
+        });
+      });
+    }
+
+    // Prevent infinite loops
+    if (round > 100) {
+      console.log("Could not generate a valid schedule after 100 rounds");
+      return [];
     }
   }
 
+  console.log("Final game counts:", Object.fromEntries(playerGameCounts));
   console.log(`Generation complete. Total matches: ${matches.length}`);
+
   return matches;
+}
+
+// Helper function to generate all possible team combinations for 4 players
+function generatePossibleTeamCombinations(players: number[]): number[][] {
+  if (players.length < 4) return [];
+
+  const combinations: number[][] = [];
+  for (let i = 0; i < players.length; i++) {
+    for (let j = i + 1; j < players.length; j++) {
+      for (let k = 0; k < players.length; k++) {
+        if (k === i || k === j) continue;
+        for (let l = k + 1; l < players.length; l++) {
+          if (l === i || l === j) continue;
+          combinations.push([players[i], players[j], players[k], players[l]]);
+        }
+      }
+    }
+  }
+  return combinations;
 }
 
 function repairSchedule(
@@ -413,23 +474,4 @@ function validateSchedule(
   }
 
   return true;
-}
-
-// Helper function to generate all possible team combinations for 4 players
-function generatePossibleTeamCombinations(players: number[]): number[][] {
-  if (players.length < 4) return []; //Handle cases with fewer than 4 players
-
-  const combinations: number[][] = [];
-  for (let i = 0; i < players.length; i++) {
-    for (let j = i + 1; j < players.length; j++) {
-      for (let k = 0; k < players.length; k++) {
-        if (k === i || k === j) continue;
-        for (let l = k + 1; l < players.length; l++) {
-          if (l === i || l === j) continue;
-          combinations.push([players[i], players[j], players[k], players[l]]);
-        }
-      }
-    }
-  }
-  return combinations;
 }
