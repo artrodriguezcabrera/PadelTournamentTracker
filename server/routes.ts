@@ -301,18 +301,19 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     });
   };
 
-  // Function to check if a player has played too many more games than others
+  // Function to check if a player has played more games than others
   const hasPlayedTooMany = (playerId: number) => {
     const playerGames = playerGameCounts.get(playerId) || 0;
     const minGames = Math.min(...Array.from(playerGameCounts.values()));
-    return playerGames > minGames + 1;
+    // Stricter balance - only allow 1 more game than the minimum
+    return playerGames > minGames;
   };
 
   // Keep generating rounds until we can't make more valid matches
   let consecutiveFailedAttempts = 0;
-  const maxFailedAttempts = 3; // Allow some failed attempts before stopping
+  const maxFailedAttempts = 5; // Increased to allow more attempts for balance
 
-  while (round <= 20 && consecutiveFailedAttempts < maxFailedAttempts) { // Increased max rounds
+  while (round <= 20 && consecutiveFailedAttempts < maxFailedAttempts) {
     const availablePlayers = new Set(playerIds);
     const roundMatches: Match[] = [];
     let matchesInRound = 0;
@@ -321,16 +322,22 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     for (let court = 1; court <= numCourts && availablePlayers.size >= 4; court++) {
       let validMatch = false;
       let attempts = 0;
-      const maxAttempts = 30; // Increased attempts per court
+      const maxAttempts = 50; // Increased attempts to find better combinations
 
       while (!validMatch && attempts < maxAttempts && availablePlayers.size >= 4) {
         attempts++;
 
-        // Select players who have played fewer games when possible
+        // Sort players by number of games played to prioritize those with fewer games
         const playerArray = Array.from(availablePlayers)
-          .sort((a, b) => (playerGameCounts.get(a) || 0) - (playerGameCounts.get(b) || 0));
+          .sort((a, b) => {
+            const aGames = playerGameCounts.get(a) || 0;
+            const bGames = playerGameCounts.get(b) || 0;
+            if (aGames !== bGames) return aGames - bGames;
+            // If same number of games, randomize to ensure variety
+            return Math.random() - 0.5;
+          });
 
-        // Try to select first 4 players who haven't played too many games
+        // Take the first 4 players who haven't played too many games
         const selectedPlayers = playerArray
           .filter(playerId => !hasPlayedTooMany(playerId))
           .slice(0, 4);
@@ -347,7 +354,14 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
             const team1HasPlayedTogether = hasPairingBeenUsed(combo[0], combo[1]);
             const team2HasPlayedTogether = hasPairingBeenUsed(combo[2], combo[3]);
 
-            if (!team1HasPlayedTogether || !team2HasPlayedTogether) {
+            // Check if this combination would maintain balance
+            const wouldMaintainBalance = combo.every(playerId => {
+              const futureGames = (playerGameCounts.get(playerId) || 0) + 1;
+              const minCurrentGames = Math.min(...Array.from(playerGameCounts.values()));
+              return futureGames <= minCurrentGames + 1;
+            });
+
+            if ((!team1HasPlayedTogether || !team2HasPlayedTogether) && wouldMaintainBalance) {
               markPairingUsed(combo[0], combo[1]);
               markPairingUsed(combo[2], combo[3]);
               incrementPlayerGames(combo);
@@ -379,13 +393,13 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     }
   }
 
-  // Verify that games are reasonably balanced
+  // Verify that games are balanced
   const gameCounts = Array.from(playerGameCounts.values());
   const minGames = Math.min(...gameCounts);
   const maxGames = Math.max(...gameCounts);
 
-  // Allow for a difference of up to 2 games between players
-  if (maxGames - minGames > 2) {
+  // Strict balance check - maximum 1 game difference
+  if (maxGames - minGames > 1) {
     return [];
   }
 
