@@ -313,9 +313,8 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   
     // Function to check if we can create a complete round
     const canCreateCompleteRound = (availablePlayers: Set<number>) => {
-      // For a complete round, we need enough players for all courts
-      const playersNeeded = numCourts * 4;
-      return availablePlayers.size >= playersNeeded;
+      // We only need enough players for at least one court (4 players)
+      return availablePlayers.size >= 4;
     };
   
     // Keep generating rounds until we can't make more balanced matches
@@ -323,33 +322,33 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       const availablePlayers = new Set(playerIds);
       const roundMatches: Match[] = [];
       let validRound = false;
-  
-      // Only proceed with this round if we can make it complete
+
+      // Only proceed with this round if we can make at least one match
       if (!canCreateCompleteRound(availablePlayers)) {
         break;
       }
-  
+
       // For each court in this round
       for (let court = 1; court <= numCourts && availablePlayers.size >= 4; court++) {
         let validMatch = false;
-  
+
         // Try to find a valid match with unused pairings
         for (let attempts = 0; attempts < 20 && !validMatch; attempts++) {
           // Randomly select 4 players
           const selectedPlayers = Array.from(availablePlayers)
             .sort(() => Math.random() - 0.5)
             .slice(0, 4);
-  
+
           if (selectedPlayers.length === 4) {
             // Check if this match would create imbalance
             if (wouldCreateImbalance(selectedPlayers)) {
               continue;
             }
-  
+
             // Create teams: (0,1) vs (2,3)
             const team1HasPlayedTogether = hasPairingBeenUsed(selectedPlayers[0], selectedPlayers[1]);
             const team2HasPlayedTogether = hasPairingBeenUsed(selectedPlayers[2], selectedPlayers[3]);
-  
+
             // Allow the match if at least one team has not played together
             if (!team1HasPlayedTogether || !team2HasPlayedTogether) {
               if (!team1HasPlayedTogether) {
@@ -359,10 +358,10 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
                 markPairingUsed(selectedPlayers[2], selectedPlayers[3]);
               }
               incrementPlayerGames(selectedPlayers);
-  
+
               // Remove these players from available pool
               selectedPlayers.forEach(p => availablePlayers.delete(p));
-  
+
               roundMatches.push({
                 players: selectedPlayers,
                 round,
@@ -374,28 +373,25 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
           }
         }
       }
-  
-      // If we couldn't generate valid matches for this round, we're done
-      if (!validRound || roundMatches.length < numCourts) {
-          // Remove the incomplete round's matches from player counts
-          roundMatches.forEach(match => {
-            match.players.forEach(playerId => {
-                playerGameCounts.set(playerId, (playerGameCounts.get(playerId) || 1) - 1);
-            });
-        });
+
+      // If we couldn't generate any valid matches for this round, we're done
+      if (!validRound) {
         break;
       }
-  
+
       matches.push(...roundMatches);
       round++;
     }
-  
-    // Verify that all players have the same number of games
-    const gameCounts = new Set(Array.from(playerGameCounts.values()));
-    if (gameCounts.size > 1) {
-      // If games are not balanced, return no matches to trigger regeneration
+
+    // Verify that all players have a similar number of games
+    // Allow for a difference of 1 game between players
+    const gameCounts = Array.from(playerGameCounts.values());
+    const minGames = Math.min(...gameCounts);
+    const maxGames = Math.max(...gameCounts);
+    if (maxGames - minGames > 1) {
+      // If games are too imbalanced, return no matches to trigger regeneration
       return [];
     }
-  
+
     return matches;
   }
