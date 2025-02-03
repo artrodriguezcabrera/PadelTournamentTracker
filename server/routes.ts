@@ -248,10 +248,11 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   // Function to check if adding these players would create imbalance
   const wouldCreateImbalance = (players: number[]) => {
     const currentMax = Math.max(...Array.from(playerGameCounts.values()));
-    const wouldExceedMax = players.some(playerId => 
-      (playerGameCounts.get(playerId) || 0) + 1 > currentMax
+    const currentMin = Math.min(...Array.from(playerGameCounts.values()));
+    // Allow up to 1 game difference
+    return players.some(playerId => 
+      (playerGameCounts.get(playerId) || 0) + 1 > currentMax + 1
     );
-    return wouldExceedMax;
   };
 
   // Keep generating rounds until we can't make more balanced matches
@@ -281,10 +282,14 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
           const team1HasPlayedTogether = hasPairingBeenUsed(selectedPlayers[0], selectedPlayers[1]);
           const team2HasPlayedTogether = hasPairingBeenUsed(selectedPlayers[2], selectedPlayers[3]);
 
-          if (!team1HasPlayedTogether && !team2HasPlayedTogether) {
-            // Both are new pairings, use this match
-            markPairingUsed(selectedPlayers[0], selectedPlayers[1]);
-            markPairingUsed(selectedPlayers[2], selectedPlayers[3]);
+          // Allow the match if at least one team has not played together
+          if (!team1HasPlayedTogether || !team2HasPlayedTogether) {
+            if (!team1HasPlayedTogether) {
+              markPairingUsed(selectedPlayers[0], selectedPlayers[1]);
+            }
+            if (!team2HasPlayedTogether) {
+              markPairingUsed(selectedPlayers[2], selectedPlayers[3]);
+            }
             incrementPlayerGames(selectedPlayers);
 
             // Remove these players from available pool
