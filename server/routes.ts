@@ -155,18 +155,21 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const gameMatches = generateGameMatchesWithCourts(playerIds, tournamentData.courts);
+      console.log("Generated matches:", gameMatches); // Add logging
 
-      if (gameMatches.length === 0) {
-        res.status(400).json({ message: "Could not generate valid game matches" });
+      if (!gameMatches || gameMatches.length === 0) {
+        res.status(400).json({ message: "Could not generate valid game matches. Please ensure you have enough players and try again." });
         return;
       }
 
       await db.transaction(async (tx) => {
+        // Set tournament to active
         await tx
           .update(tournaments)
           .set({ isActive: true })
           .where(eq(tournaments.id, tournamentId));
 
+        // Create games for each match
         const gameValues = gameMatches.map(match => ({
           tournamentId,
           roundNumber: match.round,
@@ -177,15 +180,24 @@ export function registerRoutes(app: Express): Server {
           player4Id: match.players[3],
         }));
 
+        console.log("Creating games:", gameValues); // Add logging
+
         if (gameValues.length > 0) {
           await tx.insert(games).values(gameValues);
         }
       });
 
-      res.json({ message: "Tournament started successfully", gamesGenerated: gameMatches.length });
+      res.json({ 
+        message: "Tournament started successfully", 
+        gamesGenerated: gameMatches.length,
+        games: gameMatches 
+      });
     } catch (error) {
       console.error("Error starting tournament:", error);
-      res.status(500).json({ message: "Failed to start tournament" });
+      res.status(500).json({ 
+        message: "Failed to start tournament", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
     }
   });
 

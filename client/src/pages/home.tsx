@@ -19,18 +19,23 @@ export default function Home() {
 
   const startTournament = useMutation({
     mutationFn: async (tournamentId: number) => {
-      await fetch(`/api/tournaments/${tournamentId}/start`, {
+      const response = await fetch(`/api/tournaments/${tournamentId}/start`, {
         method: "POST",
       });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to start tournament');
+      }
+      return data;
     },
     onSuccess: (_data, tournamentId) => {
       // After successfully starting the tournament, navigate to the tournament page
       window.location.href = `/tournament/${tournamentId}`;
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: "Failed to start the tournament",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -99,7 +104,7 @@ export default function Home() {
                         onClick={() => startTournament.mutate(tournament.id)}
                         disabled={startTournament.isPending}
                       >
-                        Start Tournament
+                        {startTournament.isPending ? "Starting..." : "Start Tournament"}
                       </Button>
                       <Dialog
                         open={editingTournament === tournament.id}
