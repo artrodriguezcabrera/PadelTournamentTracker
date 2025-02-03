@@ -108,16 +108,22 @@ export function registerRoutes(app: Express): Server {
 
     // Generate all possible game combinations with court assignments
     const playerIds = tournamentData.tournamentPlayers.map(tp => tp.playerId);
-    const gameMatches = generateGameMatchesWithCourts(playerIds, tournamentData.courts);
 
-    await db.transaction(async (tx) => {
-      await tx
-        .update(tournaments)
-        .set({ isActive: true })
-        .where(eq(tournaments.id, tournamentId));
+    try {
+      const gameMatches = generateGameMatchesWithCourts(playerIds, tournamentData.courts);
 
-      await tx.insert(games).values(
-        gameMatches.map(match => ({
+      if (gameMatches.length === 0) {
+        res.status(400).json({ message: "Could not generate valid game matches" });
+        return;
+      }
+
+      await db.transaction(async (tx) => {
+        await tx
+          .update(tournaments)
+          .set({ isActive: true })
+          .where(eq(tournaments.id, tournamentId));
+
+        const gameValues = gameMatches.map(match => ({
           tournamentId,
           roundNumber: match.round,
           courtNumber: match.court,
@@ -125,11 +131,18 @@ export function registerRoutes(app: Express): Server {
           player2Id: match.players[1],
           player3Id: match.players[2],
           player4Id: match.players[3],
-        }))
-      );
-    });
+        }));
 
-    res.json({ message: "Tournament started" });
+        if (gameValues.length > 0) {
+          await tx.insert(games).values(gameValues);
+        }
+      });
+
+      res.json({ message: "Tournament started successfully", gamesGenerated: gameMatches.length });
+    } catch (error) {
+      console.error("Error starting tournament:", error);
+      res.status(500).json({ message: "Failed to start tournament" });
+    }
   });
 
     app.patch("/api/tournaments/:id/players", async (req, res) => {
@@ -249,13 +262,12 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
     // For each court in this round
     for (let court = 1; court <= numCourts && availablePlayers.size >= 4; court++) {
-      const players = Array.from(availablePlayers);
       let validMatch = false;
 
       // Try to find a valid match with unused pairings
       for (let attempts = 0; attempts < 20 && !validMatch; attempts++) {
         // Randomly select 4 players
-        const selectedPlayers = players
+        const selectedPlayers = Array.from(availablePlayers)
           .sort(() => Math.random() - 0.5)
           .slice(0, 4);
 
