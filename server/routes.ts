@@ -208,47 +208,73 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   const matches: Match[] = [];
   let round = 1;
   const usedCombinations = new Set<string>();
+  const partnerships = new Map<string, boolean>();
 
-  // Function to check if a combination has been used
-  const hasBeenUsed = (players: number[]) => {
-    const sorted = [...players].sort().join(',');
-    return usedCombinations.has(sorted);
+  // Initialize all possible partnerships as unused
+  for (let i = 0; i < playerIds.length; i++) {
+    for (let j = i + 1; j < playerIds.length; j++) {
+      partnerships.set(`${playerIds[i]},${playerIds[j]}`, false);
+    }
+  }
+
+  // Function to check if a partnership has been used
+  const hasPartnershipBeenUsed = (player1: number, player2: number) => {
+    const key = [player1, player2].sort((a, b) => a - b).join(',');
+    return partnerships.get(key);
   };
 
-  // Function to add a combination to used set
-  const markAsUsed = (players: number[]) => {
-    const sorted = [...players].sort().join(',');
-    usedCombinations.add(sorted);
+  // Function to mark a partnership as used
+  const markPartnershipUsed = (player1: number, player2: number) => {
+    const key = [player1, player2].sort((a, b) => a - b).join(',');
+    partnerships.set(key, true);
   };
 
-  // Keep generating rounds until we have a reasonable number of unique combinations
-  // or until we can't generate any more unique matches
-  while (round <= 10) { // Limit to 10 rounds maximum
+  // Function to check if all partnerships have been used
+  const allPartnershipsUsed = () => {
+    return Array.from(partnerships.values()).every(used => used);
+  };
+
+  // Keep generating rounds until all partnerships have been used
+  while (!allPartnershipsUsed() && round <= 20) { // Limit to 20 rounds as safety
     const availablePlayers = new Set(playerIds);
     const roundMatches: Match[] = [];
 
     // For each court in this round
     for (let court = 1; court <= numCourts && availablePlayers.size >= 4; court++) {
-      // Get 4 random players who haven't played together in this combination
-      let attempts = 0;
-      let validMatch: number[] | null = null;
+      let bestMatch: number[] | null = null;
+      let bestScore = -1;
 
-      while (attempts < 50 && !validMatch) { // Limit attempts to prevent infinite loops
+      // Try to find the best match with unused partnerships
+      for (let attempts = 0; attempts < 50 && !bestMatch; attempts++) {
         const players = Array.from(availablePlayers)
           .sort(() => Math.random() - 0.5)
           .slice(0, 4);
 
-        if (players.length === 4 && !hasBeenUsed(players)) {
-          validMatch = players;
-          players.forEach(p => availablePlayers.delete(p));
-          markAsUsed(players);
+        if (players.length === 4) {
+          // Calculate score based on number of unused partnerships
+          let score = 0;
+          // Check partnerships within team 1 (0,1)
+          if (!hasPartnershipBeenUsed(players[0], players[1])) score++;
+          // Check partnerships within team 2 (2,3)
+          if (!hasPartnershipBeenUsed(players[2], players[3])) score++;
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = players;
+          }
         }
-        attempts++;
       }
 
-      if (validMatch) {
+      if (bestMatch) {
+        // Mark partnerships as used
+        markPartnershipUsed(bestMatch[0], bestMatch[1]); // Team 1
+        markPartnershipUsed(bestMatch[2], bestMatch[3]); // Team 2
+
+        // Remove used players from available pool
+        bestMatch.forEach(p => availablePlayers.delete(p));
+
         roundMatches.push({
-          players: validMatch,
+          players: bestMatch,
           round,
           court,
         });
