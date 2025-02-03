@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import TournamentForm from "@/components/tournament-form";
@@ -15,6 +15,25 @@ export default function Home() {
 
   const { data: tournaments } = useQuery({
     queryKey: ["/api/tournaments"],
+  });
+
+  const startTournament = useMutation({
+    mutationFn: async (tournamentId: number) => {
+      await fetch(`/api/tournaments/${tournamentId}/start`, {
+        method: "POST",
+      });
+    },
+    onSuccess: (_data, tournamentId) => {
+      // After successfully starting the tournament, navigate to the tournament page
+      window.location.href = `/tournament/${tournamentId}`;
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to start the tournament",
+        variant: "destructive",
+      });
+    },
   });
 
   return (
@@ -62,42 +81,53 @@ export default function Home() {
                   Point System: {tournament.pointSystem} points
                 </p>
                 <div className="flex flex-col gap-2">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    asChild
-                  >
-                    <a href={`/tournament/${tournament.id}`}>
-                      {tournament.isActive ? "View Tournament" : "Start Tournament"}
-                    </a>
-                  </Button>
-                  {!tournament.isActive && (
-                    <Dialog
-                      open={editingTournament === tournament.id}
-                      onOpenChange={(open) =>
-                        setEditingTournament(open ? tournament.id : null)
-                      }
+                  {tournament.isActive ? (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      asChild
                     >
-                      <DialogTrigger asChild>
-                        <Button variant="secondary" className="w-full">
-                          <Users className="h-4 w-4 mr-2" />
-                          Edit Players
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[500px]">
-                        <EditTournamentPlayers
-                          tournamentId={tournament.id}
-                          currentPlayers={tournament.tournamentPlayers}
-                          onSuccess={() => {
-                            setEditingTournament(null);
-                            toast({
-                              title: "Players updated",
-                              description: "Tournament players have been updated successfully.",
-                            });
-                          }}
-                        />
-                      </DialogContent>
-                    </Dialog>
+                      <a href={`/tournament/${tournament.id}`}>
+                        View Tournament
+                      </a>
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => startTournament.mutate(tournament.id)}
+                        disabled={startTournament.isPending}
+                      >
+                        Start Tournament
+                      </Button>
+                      <Dialog
+                        open={editingTournament === tournament.id}
+                        onOpenChange={(open) =>
+                          setEditingTournament(open ? tournament.id : null)
+                        }
+                      >
+                        <DialogTrigger asChild>
+                          <Button variant="secondary" className="w-full">
+                            <Users className="h-4 w-4 mr-2" />
+                            Edit Players
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[500px]">
+                          <EditTournamentPlayers
+                            tournamentId={tournament.id}
+                            currentPlayers={tournament.tournamentPlayers}
+                            onSuccess={() => {
+                              setEditingTournament(null);
+                              toast({
+                                title: "Players updated",
+                                description: "Tournament players have been updated successfully.",
+                              });
+                            }}
+                          />
+                        </DialogContent>
+                      </Dialog>
+                    </>
                   )}
                 </div>
               </CardContent>
