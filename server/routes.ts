@@ -287,13 +287,13 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   playerIds.forEach(id => playerGameCounts.set(id, 0));
 
   // Track partnerships
-  const getPairingKey = (p1: number, p2: number) => 
+  const getPairingKey = (p1: number, p2: number) =>
     [p1, p2].sort((a, b) => a - b).join(',');
 
-  const hasPairingBeenUsed = (p1: number, p2: number) => 
+  const hasPairingBeenUsed = (p1: number, p2: number) =>
     usedPairings.has(getPairingKey(p1, p2));
 
-  const markPairingUsed = (p1: number, p2: number) => 
+  const markPairingUsed = (p1: number, p2: number) =>
     usedPairings.add(getPairingKey(p1, p2));
 
   const incrementPlayerGames = (players: number[]) => {
@@ -304,7 +304,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
   const findValidTeamCombination = (availablePlayers: number[]): number[] | null => {
     // Sort players by number of games played
-    const players = [...availablePlayers].sort((a, b) => 
+    const players = [...availablePlayers].sort((a, b) =>
       (playerGameCounts.get(a) || 0) - (playerGameCounts.get(b) || 0)
     );
 
@@ -371,66 +371,40 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       roundMatches.length = 0;
       playerGamesInRound.clear();
 
-      // Must fill all courts in each round
-      let courtsFilled = 0;
+      // Allow partial court usage
       for (let court = 1; court <= numCourts; court++) {
-        // Get available players for this game
-        const availablePlayers = playerIds.filter(id => 
-          !playerGamesInRound.get(id) && 
-          (playerGameCounts.get(id) || 0) < gamesPerPlayer
+        const availablePlayers = playerIds.filter(id =>
+          !playerGamesInRound.get(id) && (playerGameCounts.get(id) || 0) < gamesPerPlayer
         );
 
-        if (availablePlayers.length < 4) {
-          console.log(`Not enough available players for court ${court} in round ${round}`);
-          continue;
-        }
-
-        // Find valid team combinations
-        const team = findValidTeamCombination(availablePlayers);
-
-        if (team) {
-          console.log(`Found valid team for round ${round}, court ${court}:`, team);
-          // Mark partnerships and update tracking
-          markPairingUsed(team[0], team[1]);
-          markPairingUsed(team[2], team[3]);
-          team.forEach(id => playerGamesInRound.set(id, true));
-          incrementPlayerGames(team);
-
-          roundMatches.push({
-            players: team,
-            round,
-            court,
-          });
-          courtsFilled++;
-        } else {
-          console.log(`Could not find valid team for court ${court} in round ${round}`);
+        if (availablePlayers.length >= 4) {
+          const team = findValidTeamCombination(availablePlayers);
+          if (team) {
+            console.log(`Found valid team for round ${round}, court ${court}:`, team);
+            markPairingUsed(team[0], team[1]);
+            markPairingUsed(team[2], team[3]);
+            team.forEach(id => playerGamesInRound.set(id, true));
+            incrementPlayerGames(team);
+            roundMatches.push({ players: team, round, court });
+          }
         }
       }
 
-      if (courtsFilled === numCourts) {
+      if (roundMatches.length > 0) {
         matches.push(...roundMatches);
         round++;
-        console.log(`Successfully added ${roundMatches.length} matches for round ${round-1}`);
+        console.log(`Successfully added ${roundMatches.length} matches for round ${round - 1}`);
         break;
       } else {
-        console.log(`Failed to fill all courts in round ${round}, retry ${retryCount + 1}/${maxRetries}`);
-        // Reset any partnerships and game counts from this incomplete round
-        roundMatches.forEach(match => {
-          const [p1, p2, p3, p4] = match.players;
-          usedPairings.delete(getPairingKey(p1, p2));
-          usedPairings.delete(getPairingKey(p3, p4));
-          match.players.forEach(id => {
-            playerGameCounts.set(id, (playerGameCounts.get(id) || 0) - 1);
-          });
-        });
+        console.log(`Failed to fill any courts in round ${round}, retry ${retryCount + 1}/${maxRetries}`);
         retryCount++;
       }
     }
 
-    // If we couldn't generate a valid round after max retries, return failure
+    // If we couldn't generate a valid round after max retries, continue to the next round
     if (retryCount === maxRetries) {
-      console.log("Failed to generate valid round after maximum retries");
-      return [];
+      console.log("Failed to generate valid round after maximum retries.  Continuing to next round.");
+      round++;
     }
   }
 
