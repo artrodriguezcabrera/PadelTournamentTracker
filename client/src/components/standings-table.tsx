@@ -9,14 +9,11 @@ import {
 import { Card } from "@/components/ui/card";
 import { calculateStandings } from "@/lib/tournament";
 import { Trophy, Medal } from "lucide-react";
-import { type Game } from "@db/schema";
+import { type Game, type Player } from "@db/schema";
 
 type TournamentPlayer = {
   playerId: number;
-  player: {
-    id: number;
-    name: string;
-  };
+  player: Player;
 };
 
 type StandingsTableProps = {

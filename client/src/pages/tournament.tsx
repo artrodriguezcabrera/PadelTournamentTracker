@@ -16,6 +16,7 @@ type TournamentResponse = {
   pointSystem: number;
   isActive: boolean;
   tournamentPlayers: Array<{
+    playerId: number;
     player: Player;
   }>;
   games: Array<Game & {
@@ -54,7 +55,9 @@ export default function Tournament() {
     return <div>Tournament not found</div>;
   }
 
-  const players = tournament.tournamentPlayers.map(tp => tp.player);
+  // Get all completed games only for standings calculation
+  const completedGames = tournament.games.filter(game => game.isComplete);
+  const players = tournament.tournamentPlayers;
 
   return (
     <div className="min-h-screen bg-background">
@@ -94,7 +97,7 @@ export default function Tournament() {
             </TabsContent>
             <TabsContent value="standings">
               <StandingsTable
-                games={tournament.games}
+                games={completedGames}
                 players={players}
                 pointSystem={tournament.pointSystem}
               />
