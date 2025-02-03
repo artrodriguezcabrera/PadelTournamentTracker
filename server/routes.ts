@@ -303,9 +303,9 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
   // Keep generating rounds until we can't make more valid matches
   let consecutiveFailedAttempts = 0;
-  const maxFailedAttempts = 5; // Allow some failed attempts before stopping
+  const maxFailedAttempts = 10; // Increased to allow more attempts for finding valid combinations
 
-  while (round <= 20 && consecutiveFailedAttempts < maxFailedAttempts) {
+  while (consecutiveFailedAttempts < maxFailedAttempts) {
     const availablePlayers = new Set(playerIds);
     const roundMatches: Match[] = [];
     let matchesInRound = 0;
@@ -314,7 +314,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     for (let court = 1; court <= numCourts && availablePlayers.size >= 4; court++) {
       let validMatch = false;
       let attempts = 0;
-      const maxAttempts = 50; // Increased attempts to find better combinations
+      const maxAttempts = 100; // Increased attempts to find better combinations
 
       while (!validMatch && attempts < maxAttempts && availablePlayers.size >= 4) {
         attempts++;
@@ -324,9 +324,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
           .sort((a, b) => {
             const aGames = playerGameCounts.get(a) || 0;
             const bGames = playerGameCounts.get(b) || 0;
-            if (aGames !== bGames) return aGames - bGames;
-            // If same number of games, randomize to ensure variety
-            return Math.random() - 0.5;
+            return aGames - bGames;
           });
 
         // Take the first 4 players
@@ -340,14 +338,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
             const team1HasPlayedTogether = hasPairingBeenUsed(combo[0], combo[1]);
             const team2HasPlayedTogether = hasPairingBeenUsed(combo[2], combo[3]);
 
-            // Check if this combination would maintain reasonable balance
-            const wouldMaintainBalance = combo.every(playerId => {
-              const futureGames = (playerGameCounts.get(playerId) || 0) + 1;
-              const minCurrentGames = Math.min(...Array.from(playerGameCounts.values()));
-              return futureGames <= minCurrentGames + 1; 
-            });
-
-            if (!team1HasPlayedTogether && !team2HasPlayedTogether && wouldMaintainBalance) {
+            if (!team1HasPlayedTogether && !team2HasPlayedTogether) {
               markPairingUsed(combo[0], combo[1]);
               markPairingUsed(combo[2], combo[3]);
               incrementPlayerGames(combo);
