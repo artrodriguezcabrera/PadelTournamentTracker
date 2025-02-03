@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Check, PlusCircle, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,9 +19,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { type Player } from "@db/schema";
 
@@ -41,21 +43,19 @@ export default function PlayerSelect({ value, onChange }: PlayerSelectProps) {
 
   const selectedPlayers = players.filter((player) => value.includes(player.id));
 
-  const addNewPlayer = async () => {
-    if (!newPlayerName.trim()) return;
-
-    try {
-      const response = await apiRequest("POST", "/api/players", {
-        name: newPlayerName.trim(),
-      });
+  const createPlayer = useMutation({
+    mutationFn: async (name: string) => {
+      const response = await apiRequest("POST", "/api/players", { name });
       const newPlayer: Player = await response.json();
+      return newPlayer;
+    },
+    onSuccess: (newPlayer) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/players"] });
       onChange([...value, newPlayer.id]);
       setNewPlayerName("");
       setIsAddingPlayer(false);
-    } catch (error) {
-      console.error("Failed to add player:", error);
-    }
-  };
+    },
+  });
 
   return (
     <div className="flex flex-col gap-2">
@@ -118,15 +118,32 @@ export default function PlayerSelect({ value, onChange }: PlayerSelectProps) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Player</DialogTitle>
+            <DialogDescription>
+              Enter the player's name to add them to the system.
+            </DialogDescription>
           </DialogHeader>
-          <div className="flex gap-2">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (newPlayerName.trim()) {
+                createPlayer.mutate(newPlayerName.trim());
+              }
+            }}
+            className="flex gap-2"
+          >
             <Input
               value={newPlayerName}
               onChange={(e) => setNewPlayerName(e.target.value)}
               placeholder="Player name"
+              disabled={createPlayer.isPending}
             />
-            <Button onClick={addNewPlayer}>Add</Button>
-          </div>
+            <Button 
+              type="submit"
+              disabled={createPlayer.isPending || !newPlayerName.trim()}
+            >
+              Add
+            </Button>
+          </form>
         </DialogContent>
       </Dialog>
 
