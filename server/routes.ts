@@ -46,8 +46,8 @@ export function registerRoutes(app: Express): Server {
     });
 
     if (playerTournaments.length > 0) {
-      res.status(400).json({ 
-        message: "Cannot delete player that is part of a tournament" 
+      res.status(400).json({
+        message: "Cannot delete player that is part of a tournament"
       });
       return;
     }
@@ -187,61 +187,61 @@ export function registerRoutes(app: Express): Server {
         }
       });
 
-      res.json({ 
-        message: "Tournament started successfully", 
+      res.json({
+        message: "Tournament started successfully",
         gamesGenerated: gameMatches.length,
-        games: gameMatches 
+        games: gameMatches
       });
     } catch (error) {
       console.error("Error starting tournament:", error);
-      res.status(500).json({ 
-        message: "Failed to start tournament", 
-        error: error instanceof Error ? error.message : "Unknown error" 
+      res.status(500).json({
+        message: "Failed to start tournament",
+        error: error instanceof Error ? error.message : "Unknown error"
       });
     }
   });
 
-    app.patch("/api/tournaments/:id/players", async (req, res) => {
-        const tournamentId = parseInt(req.params.id);
-        const { playerIds } = req.body;
+  app.patch("/api/tournaments/:id/players", async (req, res) => {
+    const tournamentId = parseInt(req.params.id);
+    const { playerIds } = req.body;
 
-        // Ensure we have at least 4 players
-        if (playerIds.length < 4) {
-            res.status(400).json({ message: "At least 4 players are required for a tournament" });
-            return;
-        }
+    // Ensure we have at least 4 players
+    if (playerIds.length < 4) {
+      res.status(400).json({ message: "At least 4 players are required for a tournament" });
+      return;
+    }
 
-        const tournament = await db.query.tournaments.findFirst({
-            where: eq(tournaments.id, tournamentId),
-        });
-
-        if (!tournament) {
-            res.status(404).json({ message: "Tournament not found" });
-            return;
-        }
-
-        if (tournament.isActive) {
-            res.status(400).json({ message: "Cannot modify players in an active tournament" });
-            return;
-        }
-
-        await db.transaction(async (tx) => {
-            // Delete existing tournament players
-            await tx
-              .delete(tournamentPlayers)
-              .where(eq(tournamentPlayers.tournamentId, tournamentId));
-
-            // Insert new tournament players
-            await tx.insert(tournamentPlayers).values(
-                playerIds.map((playerId: number) => ({
-                    tournamentId,
-                    playerId,
-                }))
-            );
-        });
-
-        res.json({ message: "Tournament players updated successfully" });
+    const tournament = await db.query.tournaments.findFirst({
+      where: eq(tournaments.id, tournamentId),
     });
+
+    if (!tournament) {
+      res.status(404).json({ message: "Tournament not found" });
+      return;
+    }
+
+    if (tournament.isActive) {
+      res.status(400).json({ message: "Cannot modify players in an active tournament" });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      // Delete existing tournament players
+      await tx
+        .delete(tournamentPlayers)
+        .where(eq(tournamentPlayers.tournamentId, tournamentId));
+
+      // Insert new tournament players
+      await tx.insert(tournamentPlayers).values(
+        playerIds.map((playerId: number) => ({
+          tournamentId,
+          playerId,
+        }))
+      );
+    });
+
+    res.json({ message: "Tournament players updated successfully" });
+  });
 
   app.post("/api/games/:id/score", async (req, res) => {
     const { team1Score, team2Score } = req.body;
