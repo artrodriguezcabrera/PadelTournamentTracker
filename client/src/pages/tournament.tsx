@@ -33,6 +33,9 @@ export default function Tournament() {
 
   const { data: tournament, isLoading } = useQuery<TournamentResponse>({
     queryKey: [`/api/tournaments/${id}`],
+    refetchOnWindowFocus: false,
+    staleTime: 0,
+    keepPreviousData: true,
   });
 
   const startTournament = useMutation({

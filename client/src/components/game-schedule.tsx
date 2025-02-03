@@ -34,15 +34,48 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
       team1Score: number;
       team2Score: number;
     }) => {
-      await apiRequest("POST", `/api/games/${gameId}/score`, {
+      const response = await apiRequest("POST", `/api/games/${gameId}/score`, {
         team1Score,
         team2Score,
       });
+      return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [`/api/tournaments/${tournamentId}`],
+    onMutate: async ({ gameId, team1Score, team2Score }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: [`/api/tournaments/${tournamentId}`] });
+
+      // Snapshot the previous tournament data
+      const previousTournament = queryClient.getQueryData([`/api/tournaments/${tournamentId}`]);
+
+      // Optimistically update tournament data
+      queryClient.setQueryData([`/api/tournaments/${tournamentId}`], (old: any) => {
+        const newGames = old.games.map((game: GameWithPlayers) =>
+          game.id === gameId
+            ? {
+                ...game,
+                team1Score,
+                team2Score,
+                isComplete: true,
+              }
+            : game
+        );
+        return { ...old, games: newGames };
       });
+
+      return { previousTournament };
+    },
+    onError: (_err, _variables, context) => {
+      // If the mutation fails, revert back to the previous tournament data
+      if (context?.previousTournament) {
+        queryClient.setQueryData(
+          [`/api/tournaments/${tournamentId}`],
+          context.previousTournament
+        );
+      }
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure we're up to date
+      queryClient.invalidateQueries({ queryKey: [`/api/tournaments/${tournamentId}`] });
     },
   });
 
@@ -84,6 +117,7 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
                     maxPoints={pointSystem}
                     value={scores[game.id]?.team1 || ""}
                     onChange={(points) => handleScoreChange(game.id, 'team1', points)}
+                    disabled={updateScore.isPending}
                   />
                 )}
               </div>
@@ -101,6 +135,7 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
                     maxPoints={pointSystem}
                     value={scores[game.id]?.team2 || ""}
                     onChange={(points) => handleScoreChange(game.id, 'team2', points)}
+                    disabled={updateScore.isPending}
                   />
                 )}
               </div>
