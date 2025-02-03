@@ -206,41 +206,62 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   }
 
   const matches: Match[] = [];
-  const n = playerIds.length;
   let round = 1;
+  const usedCombinations = new Set<string>();
 
-  // Generate all possible combinations of 4 players
-  for (let i = 0; i < n - 3; i++) {
-    for (let j = i + 1; j < n - 2; j++) {
-      for (let k = j + 1; k < n - 1; k++) {
-        for (let l = k + 1; l < n; l++) {
-          // For each set of 4 players, create different team combinations
-          const courtAssignments = [
-            // (i,j) vs (k,l)
-            { players: [playerIds[i], playerIds[j], playerIds[k], playerIds[l]] },
-            // (i,k) vs (j,l)
-            { players: [playerIds[i], playerIds[k], playerIds[j], playerIds[l]] },
-            // (i,l) vs (j,k)
-            { players: [playerIds[i], playerIds[l], playerIds[j], playerIds[k]] }
-          ];
+  // Function to check if a combination has been used
+  const hasBeenUsed = (players: number[]) => {
+    const sorted = [...players].sort().join(',');
+    return usedCombinations.has(sorted);
+  };
 
-          // Assign rounds and courts
-          courtAssignments.forEach((match, index) => {
-            const court = (matches.length % numCourts) + 1;
-            // Start a new round when we've used all courts
-            if (court === 1 && matches.length > 0) {
-              round++;
-            }
+  // Function to add a combination to used set
+  const markAsUsed = (players: number[]) => {
+    const sorted = [...players].sort().join(',');
+    usedCombinations.add(sorted);
+  };
 
-            matches.push({
-              ...match,
-              round,
-              court,
-            });
-          });
+  // Keep generating rounds until we have a reasonable number of unique combinations
+  // or until we can't generate any more unique matches
+  while (round <= 10) { // Limit to 10 rounds maximum
+    const availablePlayers = new Set(playerIds);
+    const roundMatches: Match[] = [];
+
+    // For each court in this round
+    for (let court = 1; court <= numCourts && availablePlayers.size >= 4; court++) {
+      // Get 4 random players who haven't played together in this combination
+      let attempts = 0;
+      let validMatch: number[] | null = null;
+
+      while (attempts < 50 && !validMatch) { // Limit attempts to prevent infinite loops
+        const players = Array.from(availablePlayers)
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 4);
+
+        if (players.length === 4 && !hasBeenUsed(players)) {
+          validMatch = players;
+          players.forEach(p => availablePlayers.delete(p));
+          markAsUsed(players);
         }
+        attempts++;
+      }
+
+      if (validMatch) {
+        roundMatches.push({
+          players: validMatch,
+          round,
+          court,
+        });
       }
     }
+
+    // If we couldn't generate any matches for this round, we're done
+    if (roundMatches.length === 0) {
+      break;
+    }
+
+    matches.push(...roundMatches);
+    round++;
   }
 
   return matches;
