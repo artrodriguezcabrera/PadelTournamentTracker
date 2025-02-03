@@ -93,7 +93,11 @@ export default function Tournament() {
               <TabsTrigger value="standings">Standings</TabsTrigger>
             </TabsList>
             <TabsContent value="games">
-              <GameSchedule tournamentId={tournament.id} games={tournament.games} />
+              <GameSchedule
+                tournamentId={tournament.id}
+                games={tournament.games}
+                pointSystem={tournament.pointSystem}
+              />
             </TabsContent>
             <TabsContent value="standings">
               <StandingsTable

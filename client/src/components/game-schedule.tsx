@@ -1,12 +1,12 @@
 import { useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { type Game } from "@db/schema";
+import PointSelector from "./point-selector";
 
 type GameWithPlayers = Game & {
   player1: { name: string };
@@ -18,9 +18,10 @@ type GameWithPlayers = Game & {
 type GameScheduleProps = {
   tournamentId: number;
   games: GameWithPlayers[];
+  pointSystem: number;
 };
 
-export default function GameSchedule({ tournamentId, games }: GameScheduleProps) {
+export default function GameSchedule({ tournamentId, games, pointSystem }: GameScheduleProps) {
   const [scores, setScores] = useState<Record<number, { team1: string; team2: string }>>({});
 
   const updateScore = useMutation({
@@ -45,16 +46,25 @@ export default function GameSchedule({ tournamentId, games }: GameScheduleProps)
     },
   });
 
-  const handleScoreSubmit = (gameId: number) => {
-    const gameScores = scores[gameId];
-    if (!gameScores) return;
+  const handleScoreChange = (gameId: number, team: 'team1' | 'team2', points: number) => {
+    const oppositeTeam = team === 'team1' ? 'team2' : 'team1';
+    const remainingPoints = pointSystem - points;
 
-    const team1Score = parseInt(gameScores.team1);
-    const team2Score = parseInt(gameScores.team2);
+    setScores({
+      ...scores,
+      [gameId]: {
+        ...(scores[gameId] || {}),
+        [team]: points.toString(),
+        [oppositeTeam]: remainingPoints.toString(),
+      },
+    });
 
-    if (isNaN(team1Score) || isNaN(team2Score)) return;
-
-    updateScore.mutate({ gameId, team1Score, team2Score });
+    // Automatically submit the score when both teams have scores
+    updateScore.mutate({
+      gameId,
+      team1Score: team === 'team1' ? points : remainingPoints,
+      team2Score: team === 'team2' ? points : remainingPoints,
+    });
   };
 
   return (
@@ -70,23 +80,11 @@ export default function GameSchedule({ tournamentId, games }: GameScheduleProps)
                 {game.isComplete ? (
                   <div className="text-xl font-bold">{game.team1Score}</div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Score"
-                      className="w-20"
-                      value={scores[game.id]?.team1 || ""}
-                      onChange={(e) =>
-                        setScores({
-                          ...scores,
-                          [game.id]: {
-                            ...scores[game.id],
-                            team1: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </div>
+                  <PointSelector
+                    maxPoints={pointSystem}
+                    value={scores[game.id]?.team1 || ""}
+                    onChange={(points) => handleScoreChange(game.id, 'team1', points)}
+                  />
                 )}
               </div>
 
@@ -99,35 +97,13 @@ export default function GameSchedule({ tournamentId, games }: GameScheduleProps)
                 {game.isComplete ? (
                   <div className="text-xl font-bold">{game.team2Score}</div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Score"
-                      className="w-20"
-                      value={scores[game.id]?.team2 || ""}
-                      onChange={(e) =>
-                        setScores({
-                          ...scores,
-                          [game.id]: {
-                            ...scores[game.id],
-                            team2: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </div>
+                  <PointSelector
+                    maxPoints={pointSystem}
+                    value={scores[game.id]?.team2 || ""}
+                    onChange={(points) => handleScoreChange(game.id, 'team2', points)}
+                  />
                 )}
               </div>
-
-              {!game.isComplete && (
-                <Button
-                  onClick={() => handleScoreSubmit(game.id)}
-                  disabled={updateScore.isPending}
-                  className="w-full mt-2"
-                >
-                  Submit
-                </Button>
-              )}
             </div>
           </CardContent>
         </Card>
