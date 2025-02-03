@@ -302,8 +302,35 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     });
   };
 
+  const findValidTeamCombination = (availablePlayers: number[]): number[] | null => {
+    // Sort players by number of games played
+    const players = [...availablePlayers].sort((a, b) => 
+      (playerGameCounts.get(a) || 0) - (playerGameCounts.get(b) || 0)
+    );
+
+    // Try to find valid combinations
+    for (let i = 0; i < players.length - 3; i++) {
+      for (let j = i + 1; j < players.length - 2; j++) {
+        if (hasPairingBeenUsed(players[i], players[j])) continue;
+
+        for (let k = j + 1; k < players.length - 1; k++) {
+          for (let l = k + 1; l < players.length; l++) {
+            if (!hasPairingBeenUsed(players[k], players[l])) {
+              return [players[i], players[j], players[k], players[l]];
+            }
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  console.log(`Starting generation for ${playerIds.length} players, requiring ${requiredRounds} rounds`);
+
   // Generate rounds until we reach N-1 rounds
   while (round <= requiredRounds) {
+    console.log(`Generating round ${round}`);
+
     // Reset round-specific tracking
     playerGamesInRound.clear();
     const roundMatches: Match[] = [];
@@ -313,16 +340,16 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       // Get available players for this game
       const availablePlayers = playerIds.filter(id => !playerGamesInRound.get(id));
 
-      if (availablePlayers.length < 4) continue;
+      if (availablePlayers.length < 4) {
+        console.log(`Not enough available players for court ${court} in round ${round}`);
+        continue;
+      }
 
       // Find valid team combinations
-      const team = findValidTeamCombination(
-        availablePlayers,
-        usedPairings,
-        playerGameCounts
-      );
+      const team = findValidTeamCombination(availablePlayers);
 
       if (team) {
+        console.log(`Found valid team for round ${round}, court ${court}:`, team);
         // Mark partnerships and update tracking
         markPairingUsed(team[0], team[1]);
         markPairingUsed(team[2], team[3]);
@@ -334,6 +361,8 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
           round,
           court,
         });
+      } else {
+        console.log(`Could not find valid team for court ${court} in round ${round}`);
       }
     }
 
@@ -341,63 +370,15 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     if (roundMatches.length > 0) {
       matches.push(...roundMatches);
       round++;
+      console.log(`Successfully added ${roundMatches.length} matches for round ${round-1}`);
     } else {
-      // If we couldn't make any matches, try to repair the schedule
-      const success = repairSchedule(
-        matches,
-        playerIds,
-        usedPairings,
-        playerGameCounts,
-        requiredRounds
-      );
-
-      if (!success) {
-        console.log("Failed to generate valid schedule");
-        return [];
-      }
+      console.log(`Failed to generate any matches for round ${round}`);
+      return []; // If we can't make any matches in a round, start over
     }
   }
 
-  // Verify the schedule is valid
-  if (!validateSchedule(matches, playerIds, requiredRounds)) {
-    console.log("Invalid schedule generated");
-    return [];
-  }
-
+  console.log(`Generation complete. Total matches: ${matches.length}`);
   return matches;
-}
-
-function findValidTeamCombination(
-  players: number[],
-  usedPairings: Set<string>,
-  playerGameCounts: Map<number, number>
-): number[] | null {
-  // Sort players by number of games played
-  players.sort((a, b) => 
-    (playerGameCounts.get(a) || 0) - (playerGameCounts.get(b) || 0)
-  );
-
-  // Try to find valid combinations
-  for (let i = 0; i < players.length - 3; i++) {
-    for (let j = i + 1; j < players.length - 2; j++) {
-      if (hasPairingBeenUsed(players[i], players[j])) continue;
-
-      for (let k = j + 1; k < players.length - 1; k++) {
-        for (let l = k + 1; l < players.length; l++) {
-          if (!hasPairingBeenUsed(players[k], players[l])) {
-            return [players[i], players[j], players[k], players[l]];
-          }
-        }
-      }
-    }
-  }
-
-  return null;
-}
-
-function hasPairingBeenUsed(p1: number, p2: number): boolean {
-  const key = [p1, p2].sort((a, b) => a - b).join(',');
-  return usedPairings.has(key);
 }
 
 function repairSchedule(
