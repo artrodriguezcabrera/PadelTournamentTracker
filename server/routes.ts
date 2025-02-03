@@ -207,77 +207,58 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
   const matches: Match[] = [];
   let round = 1;
-  const usedCombinations = new Set<string>();
-  const partnerships = new Map<string, boolean>();
+  const usedPairings = new Set<string>();
 
-  // Initialize all possible partnerships as unused
-  for (let i = 0; i < playerIds.length; i++) {
-    for (let j = i + 1; j < playerIds.length; j++) {
-      partnerships.set(`${playerIds[i]},${playerIds[j]}`, false);
-    }
-  }
-
-  // Function to check if a partnership has been used
-  const hasPartnershipBeenUsed = (player1: number, player2: number) => {
+  // Function to check if a pairing has been used
+  const hasPairingBeenUsed = (player1: number, player2: number) => {
     const key = [player1, player2].sort((a, b) => a - b).join(',');
-    return partnerships.get(key);
+    return usedPairings.has(key);
   };
 
-  // Function to mark a partnership as used
-  const markPartnershipUsed = (player1: number, player2: number) => {
+  // Function to mark a pairing as used
+  const markPairingUsed = (player1: number, player2: number) => {
     const key = [player1, player2].sort((a, b) => a - b).join(',');
-    partnerships.set(key, true);
+    usedPairings.add(key);
   };
 
-  // Function to check if all partnerships have been used
-  const allPartnershipsUsed = () => {
-    return Array.from(partnerships.values()).every(used => used);
-  };
-
-  // Keep generating rounds until all partnerships have been used
-  while (!allPartnershipsUsed() && round <= 20) { // Limit to 20 rounds as safety
+  // Keep generating rounds until we reach a reasonable number or can't make more valid matches
+  while (round <= 10) { // Limit to 10 rounds
     const availablePlayers = new Set(playerIds);
     const roundMatches: Match[] = [];
 
     // For each court in this round
     for (let court = 1; court <= numCourts && availablePlayers.size >= 4; court++) {
-      let bestMatch: number[] | null = null;
-      let bestScore = -1;
+      const players = Array.from(availablePlayers);
+      let validMatch = false;
 
-      // Try to find the best match with unused partnerships
-      for (let attempts = 0; attempts < 50 && !bestMatch; attempts++) {
-        const players = Array.from(availablePlayers)
+      // Try to find a valid match with unused pairings
+      for (let attempts = 0; attempts < 20 && !validMatch; attempts++) {
+        // Randomly select 4 players
+        const selectedPlayers = players
           .sort(() => Math.random() - 0.5)
           .slice(0, 4);
 
-        if (players.length === 4) {
-          // Calculate score based on number of unused partnerships
-          let score = 0;
-          // Check partnerships within team 1 (0,1)
-          if (!hasPartnershipBeenUsed(players[0], players[1])) score++;
-          // Check partnerships within team 2 (2,3)
-          if (!hasPartnershipBeenUsed(players[2], players[3])) score++;
+        if (selectedPlayers.length === 4) {
+          // Create teams: (0,1) vs (2,3)
+          const team1HasPlayedTogether = hasPairingBeenUsed(selectedPlayers[0], selectedPlayers[1]);
+          const team2HasPlayedTogether = hasPairingBeenUsed(selectedPlayers[2], selectedPlayers[3]);
 
-          if (score > bestScore) {
-            bestScore = score;
-            bestMatch = players;
+          if (!team1HasPlayedTogether || !team2HasPlayedTogether) {
+            // At least one new pairing, use this match
+            markPairingUsed(selectedPlayers[0], selectedPlayers[1]);
+            markPairingUsed(selectedPlayers[2], selectedPlayers[3]);
+
+            // Remove these players from available pool
+            selectedPlayers.forEach(p => availablePlayers.delete(p));
+
+            roundMatches.push({
+              players: selectedPlayers,
+              round,
+              court,
+            });
+            validMatch = true;
           }
         }
-      }
-
-      if (bestMatch) {
-        // Mark partnerships as used
-        markPartnershipUsed(bestMatch[0], bestMatch[1]); // Team 1
-        markPartnershipUsed(bestMatch[2], bestMatch[3]); // Team 2
-
-        // Remove used players from available pool
-        bestMatch.forEach(p => availablePlayers.delete(p));
-
-        roundMatches.push({
-          players: bestMatch,
-          round,
-          court,
-        });
       }
     }
 
