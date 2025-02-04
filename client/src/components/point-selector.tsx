@@ -27,7 +27,7 @@ export default function PointSelector({
       <PopoverTrigger asChild>
         <Button 
           variant="outline" 
-          className="w-20 relative overflow-hidden"
+          className="w-[4.5rem] sm:w-20 h-10 relative overflow-hidden"
           disabled={disabled}
         >
           <AnimatePresence mode="wait">
@@ -37,14 +37,14 @@ export default function PointSelector({
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: -20, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="absolute inset-0 flex items-center justify-center"
+              className="absolute inset-0 flex items-center justify-center text-sm sm:text-base"
             >
               {value || 'Score'}
             </motion.span>
           </AnimatePresence>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-2">
+      <PopoverContent className="w-[280px] p-2">
         <div className="grid grid-cols-4 gap-2">
           {points.map((point) => (
             <motion.div
@@ -55,7 +55,7 @@ export default function PointSelector({
               <Button
                 variant="outline"
                 className={cn(
-                  "h-10 w-full",
+                  "h-12 w-full text-base",
                   parseInt(value) === point && "bg-primary text-primary-foreground"
                 )}
                 onClick={() => onChange(point)}

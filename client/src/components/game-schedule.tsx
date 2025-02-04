@@ -101,13 +101,11 @@ export default function GameSchedule({ tournamentId, games, pointSystem, roundNu
     });
   };
 
-  // Get unique court numbers for this round while preserving order
   const courts = [...new Set(games.map(game => game.courtNumber))];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       {courts.map((courtNumber) => {
-        // Get games for this court in this round
         const courtGames = games.filter(game => game.courtNumber === courtNumber);
 
         return (
@@ -132,13 +130,13 @@ export default function GameSchedule({ tournamentId, games, pointSystem, roundNu
                     <CardContent className="pt-6">
                       <div className="flex flex-col space-y-4">
                         <motion.div 
-                          className="flex items-center justify-between"
+                          className="flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap"
                           animate={lastUpdated === game.id ? { 
                             backgroundColor: ["transparent", "rgba(var(--primary) / 0.1)", "transparent"],
                             transition: { duration: 0.3 }
                           } : {}}
                         >
-                          <div className="font-medium">
+                          <div className="font-medium min-w-[150px] text-sm sm:text-base">
                             {game.player1.name} & {game.player2.name}
                           </div>
                           <PointSelector
@@ -152,13 +150,13 @@ export default function GameSchedule({ tournamentId, games, pointSystem, roundNu
                         <Separator className="my-2" />
 
                         <motion.div 
-                          className="flex items-center justify-between"
+                          className="flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap"
                           animate={lastUpdated === game.id ? { 
                             backgroundColor: ["transparent", "rgba(var(--primary) / 0.1)", "transparent"],
                             transition: { duration: 0.3 }
                           } : {}}
                         >
-                          <div className="font-medium">
+                          <div className="font-medium min-w-[150px] text-sm sm:text-base">
                             {game.player3.name} & {game.player4.name}
                           </div>
                           <PointSelector

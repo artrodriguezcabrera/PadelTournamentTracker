@@ -45,42 +45,37 @@ export default function Tournament() {
     return <div>Tournament not found</div>;
   }
 
-  // Get all completed games only for standings calculation
   const completedGames = tournament.games.filter(game => game.isComplete);
   const players = tournament.tournamentPlayers;
-
-  // Get unique rounds in original order
   const rounds = [...new Set(tournament.games.map(game => game.roundNumber))];
-
-  // If no round is selected, default to the first round
   const currentRound = selectedRound ?? rounds[0];
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="icon" asChild>
+      <div className="container mx-auto px-4 py-4 sm:py-8">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 sm:mb-8">
+          <Button variant="ghost" size="icon" className="self-start" asChild>
             <a href="/">
               <ArrowLeft className="h-4 w-4" />
             </a>
           </Button>
-          <h1 className="text-4xl font-bold">{tournament.name}</h1>
+          <h1 className="text-2xl sm:text-4xl font-bold">{tournament.name}</h1>
         </div>
 
         <Tabs defaultValue="games" onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="games">Games</TabsTrigger>
-            <TabsTrigger value="standings">Standings</TabsTrigger>
+          <TabsList className="w-full sm:w-auto mb-4">
+            <TabsTrigger value="games" className="flex-1 sm:flex-none">Games</TabsTrigger>
+            <TabsTrigger value="standings" className="flex-1 sm:flex-none">Standings</TabsTrigger>
           </TabsList>
 
           {activeTab === "games" && (
-            <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+            <div className="flex flex-wrap gap-2 mb-6 overflow-x-auto pb-2">
               {rounds.map((round) => (
                 <Button
                   key={round}
                   variant={currentRound === round ? "default" : "outline"}
                   className={cn(
-                    "min-w-[3rem]",
+                    "min-w-[3rem] flex-shrink-0",
                     currentRound === round && "font-bold"
                   )}
                   onClick={() => setSelectedRound(round)}
