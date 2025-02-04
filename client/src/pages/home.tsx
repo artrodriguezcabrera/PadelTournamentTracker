@@ -25,6 +25,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Trophy, Users, MoreVertical, Edit, Trash } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
+import { type Tournament } from "@db/schema";
+
+type TournamentWithPlayers = Tournament & {
+  tournamentPlayers: Array<{
+    playerId: number;
+    player: { id: number; name: string };
+  }>;
+};
 
 export default function Home() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -33,7 +41,7 @@ export default function Home() {
   const [deletingTournament, setDeletingTournament] = useState<number | null>(null);
   const { toast } = useToast();
 
-  const { data: tournaments } = useQuery({
+  const { data: tournaments } = useQuery<TournamentWithPlayers[]>({
     queryKey: ["/api/tournaments"],
   });
 
@@ -206,7 +214,7 @@ export default function Home() {
         >
           <DialogContent className="sm:max-w-[500px]">
             <TournamentForm
-              tournament={tournaments?.find(t => t.id === editingTournament)}
+              tournament={tournaments?.find((t) => t.id === editingTournament)}
               onSuccess={() => {
                 setEditingTournament(null);
                 toast({
