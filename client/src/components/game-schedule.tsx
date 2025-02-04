@@ -102,121 +102,106 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
     });
   };
 
-  // Group games by round and court, preserving original order
-  const gamesByRound = new Map<number, Map<number, GameWithPlayers[]>>();
-  const roundOrder: number[] = [];
-  const courtOrderByRound = new Map<number, number[]>();
-
-  // First, collect all unique rounds and courts in their original order
-  games.forEach(game => {
-    if (!roundOrder.includes(game.roundNumber)) {
-      roundOrder.push(game.roundNumber);
-    }
-
-    const courtsForRound = courtOrderByRound.get(game.roundNumber) || [];
-    if (!courtsForRound.includes(game.courtNumber)) {
-      courtsForRound.push(game.courtNumber);
-      courtOrderByRound.set(game.roundNumber, courtsForRound);
-    }
-  });
-
-  // Then group games while maintaining the order
-  games.forEach(game => {
-    if (!gamesByRound.has(game.roundNumber)) {
-      gamesByRound.set(game.roundNumber, new Map());
-    }
-    const roundMap = gamesByRound.get(game.roundNumber)!;
-    if (!roundMap.has(game.courtNumber)) {
-      roundMap.set(game.courtNumber, []);
-    }
-    roundMap.get(game.courtNumber)!.push(game);
-  });
+  // Get unique round numbers while preserving order
+  const rounds = [...new Set(games.map(game => game.roundNumber))];
 
   return (
     <div className="space-y-8">
-      {roundOrder.map((roundNumber) => (
-        <motion.div 
-          key={roundNumber} 
-          className="space-y-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          layoutId={`round-${roundNumber}`}
-        >
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Layers className="h-6 w-6" />
-            Round {roundNumber}
-          </h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {courtOrderByRound.get(roundNumber)?.map((courtNumber) => (
-              <div key={`court-${roundNumber}-${courtNumber}`} className="space-y-4">
-                <h3 className="text-lg font-semibold text-muted-foreground">
-                  Court {courtNumber}
-                </h3>
-                <AnimatePresence>
-                  {gamesByRound.get(roundNumber)?.get(courtNumber)?.map((game) => (
-                    <motion.div
-                      key={`game-${game.id}`}
-                      layoutId={`game-${game.id}`}
-                      animate={lastUpdated === game.id ? {
-                        scale: [1, 1.02, 1],
-                        transition: { duration: 0.3 }
-                      } : {}}
-                    >
-                      <Card className={cn(
-                        "transition-shadow duration-200",
-                        lastUpdated === game.id && "shadow-lg"
-                      )}>
-                        <CardContent className="pt-6">
-                          <div className="flex flex-col space-y-4">
-                            <motion.div 
-                              className="flex items-center justify-between"
-                              animate={lastUpdated === game.id ? { 
-                                backgroundColor: ["transparent", "rgba(var(--primary) / 0.1)", "transparent"],
-                                transition: { duration: 0.3 }
-                              } : {}}
-                            >
-                              <div className="font-medium">
-                                {game.player1.name} & {game.player2.name}
-                              </div>
-                              <PointSelector
-                                maxPoints={pointSystem}
-                                value={(game.isComplete ? game.team1Score : scores[game.id]?.team1) || ""}
-                                onChange={(points) => handleScoreChange(game.id, 'team1', points)}
-                                disabled={updateScore.isPending}
-                              />
-                            </motion.div>
+      {rounds.map((roundNumber) => {
+        // Get all games for this round
+        const roundGames = games.filter(game => game.roundNumber === roundNumber);
+        // Get unique court numbers for this round while preserving order
+        const courts = [...new Set(roundGames.map(game => game.courtNumber))];
 
-                            <Separator className="my-2" />
+        return (
+          <motion.div 
+            key={roundNumber} 
+            className="space-y-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            layoutId={`round-${roundNumber}`}
+          >
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Layers className="h-6 w-6" />
+              Round {roundNumber}
+            </h2>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {courts.map((courtNumber) => {
+                // Get games for this court in this round
+                const courtGames = roundGames.filter(game => game.courtNumber === courtNumber);
 
-                            <motion.div 
-                              className="flex items-center justify-between"
-                              animate={lastUpdated === game.id ? { 
-                                backgroundColor: ["transparent", "rgba(var(--primary) / 0.1)", "transparent"],
-                                transition: { duration: 0.3 }
-                              } : {}}
-                            >
-                              <div className="font-medium">
-                                {game.player3.name} & {game.player4.name}
+                return (
+                  <div key={`court-${roundNumber}-${courtNumber}`} className="space-y-4">
+                    <h3 className="text-lg font-semibold text-muted-foreground">
+                      Court {courtNumber}
+                    </h3>
+                    <AnimatePresence>
+                      {courtGames.map((game) => (
+                        <motion.div
+                          key={`game-${game.id}`}
+                          layoutId={`game-${game.id}`}
+                          animate={lastUpdated === game.id ? {
+                            scale: [1, 1.02, 1],
+                            transition: { duration: 0.3 }
+                          } : {}}
+                        >
+                          <Card className={cn(
+                            "transition-shadow duration-200",
+                            lastUpdated === game.id && "shadow-lg"
+                          )}>
+                            <CardContent className="pt-6">
+                              <div className="flex flex-col space-y-4">
+                                <motion.div 
+                                  className="flex items-center justify-between"
+                                  animate={lastUpdated === game.id ? { 
+                                    backgroundColor: ["transparent", "rgba(var(--primary) / 0.1)", "transparent"],
+                                    transition: { duration: 0.3 }
+                                  } : {}}
+                                >
+                                  <div className="font-medium">
+                                    {game.player1.name} & {game.player2.name}
+                                  </div>
+                                  <PointSelector
+                                    maxPoints={pointSystem}
+                                    value={(game.isComplete ? game.team1Score : scores[game.id]?.team1) || ""}
+                                    onChange={(points) => handleScoreChange(game.id, 'team1', points)}
+                                    disabled={updateScore.isPending}
+                                  />
+                                </motion.div>
+
+                                <Separator className="my-2" />
+
+                                <motion.div 
+                                  className="flex items-center justify-between"
+                                  animate={lastUpdated === game.id ? { 
+                                    backgroundColor: ["transparent", "rgba(var(--primary) / 0.1)", "transparent"],
+                                    transition: { duration: 0.3 }
+                                  } : {}}
+                                >
+                                  <div className="font-medium">
+                                    {game.player3.name} & {game.player4.name}
+                                  </div>
+                                  <PointSelector
+                                    maxPoints={pointSystem}
+                                    value={(game.isComplete ? game.team2Score : scores[game.id]?.team2) || ""}
+                                    onChange={(points) => handleScoreChange(game.id, 'team2', points)}
+                                    disabled={updateScore.isPending}
+                                  />
+                                </motion.div>
                               </div>
-                              <PointSelector
-                                maxPoints={pointSystem}
-                                value={(game.isComplete ? game.team2Score : scores[game.id]?.team2) || ""}
-                                onChange={(points) => handleScoreChange(game.id, 'team2', points)}
-                                disabled={updateScore.isPending}
-                              />
-                            </motion.div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      ))}
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        );
+      })}
     </div>
   );
 }
