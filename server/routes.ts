@@ -98,14 +98,28 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/tournaments", async (req, res) => {
-    const { name, pointSystem, courts } = req.body;
+    const { name, pointSystem, courts, playerIds } = req.body;
 
-    // Create tournament without players initially
+    // Ensure we have at least 4 players
+    if (!playerIds || playerIds.length < 4) {
+      res.status(400).json({ message: "At least 4 players are required for a tournament" });
+      return;
+    }
+
+    // Create tournament with players
     const newTournament = await db.transaction(async (tx) => {
       const [tournament] = await tx
         .insert(tournaments)
         .values({ name, pointSystem, courts })
         .returning();
+
+      // Insert tournament players
+      await tx.insert(tournamentPlayers).values(
+        playerIds.map((playerId: number) => ({
+          tournamentId: tournament.id,
+          playerId,
+        }))
+      );
 
       return tournament;
     });

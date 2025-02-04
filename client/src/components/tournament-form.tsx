@@ -1,5 +1,5 @@
 import { useForm } from "react-hook-form";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -21,11 +21,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
+import PlayerSelect from "./player-select";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   pointSystem: z.enum(["16", "24", "32"]),
   courts: z.string().transform((val) => parseInt(val)),
+  playerIds: z.array(z.number()).min(4, "At least 4 players are required"),
 });
 
 type Tournament = {
@@ -33,6 +35,7 @@ type Tournament = {
   name: string;
   pointSystem: number;
   courts: number;
+  playerIds?: number[];
 };
 
 type TournamentFormProps = {
@@ -45,8 +48,9 @@ export default function TournamentForm({ tournament, onSuccess }: TournamentForm
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: tournament?.name || "",
-      pointSystem: tournament?.pointSystem.toString() as "16" | "24" | "32" || "16",
-      courts: tournament?.courts.toString() || "1",
+      pointSystem: tournament?.pointSystem?.toString() as "16" | "24" | "32" || "16",
+      courts: tournament?.courts?.toString() || "1",
+      playerIds: tournament?.playerIds || [],
     },
   });
 
@@ -132,6 +136,23 @@ export default function TournamentForm({ tournament, onSuccess }: TournamentForm
                   <SelectItem value="4">4 Courts</SelectItem>
                 </SelectContent>
               </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="playerIds"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Players (minimum 4)</FormLabel>
+              <FormControl>
+                <PlayerSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
