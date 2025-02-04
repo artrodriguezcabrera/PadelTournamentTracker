@@ -381,9 +381,9 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
     // Track players used in this round
     const playersUsedInRound = new Set<number>();
-    let matchesThisRound = [];
+    let roundMatches = [];
 
-    // Try to fill all courts in this round
+    // Try to create matches for all courts in this round
     for (let court = 1; court <= numCourts; court++) {
       // Get players who haven't played in this round and haven't maxed out their games
       const availablePlayers = playerIds
@@ -393,8 +393,15 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
         )
         .sort((a, b) => (playerGamesCount.get(a) || 0) - (playerGamesCount.get(b) || 0));
 
+      // If we don't have enough players for a match
       if (availablePlayers.length < 4) {
-        break; // Not enough players for another match
+        // Only accept incomplete round if this isn't the first court
+        // or if we've already created some matches in this round
+        if (court > 1 || roundMatches.length > 0) {
+          break;
+        }
+        // If we can't even fill court 1, we're done
+        return matches;
       }
 
       const match = createValidMatch(
@@ -404,28 +411,34 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       );
 
       if (!match) {
-        break; // No valid match possible with remaining players
+        // Only accept failure if this isn't the first court
+        // or if we've already created some matches in this round
+        if (court > 1 || roundMatches.length > 0) {
+          break;
+        }
+        // If we can't create a match for court 1, we're done
+        return matches;
       }
 
-      // Add match to this round's collection
-      matchesThisRound.push({
+      // Mark players as used for this round
+      match.forEach(id => playersUsedInRound.add(id));
+
+      // Add to round matches
+      roundMatches.push({
         players: match,
         round,
         court
       });
-
-      // Mark players as used for this round
-      match.forEach(id => playersUsedInRound.add(id));
     }
 
     // If we couldn't create any matches for this round, we're done
-    if (matchesThisRound.length === 0) {
+    if (roundMatches.length === 0) {
       console.log("Could not create any matches in round", round);
       break;
     }
 
-    // Add all matches for this round
-    matchesThisRound.forEach(match => {
+    // Process all matches for this round
+    roundMatches.forEach(match => {
       // Record partnerships
       usedPairings.add(getPairingKey(match.players[0], match.players[1]));
       usedPairings.add(getPairingKey(match.players[2], match.players[3]));
@@ -435,11 +448,11 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
         playerGamesCount.set(id, (playerGamesCount.get(id) || 0) + 1);
       });
 
-      // Add match to final schedule
+      // Add to final schedule
       matches.push(match);
     });
 
-    console.log(`Round ${round}: Created ${matchesThisRound.length} matches`);
+    console.log(`Round ${round}: Created ${roundMatches.length} matches`);
     round++;
   }
 
