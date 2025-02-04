@@ -21,13 +21,21 @@ export function registerRoutes(app: Express): Server {
 
   // Player routes
   app.get("/api/players", requireAuth, async (req, res) => {
-    const allPlayers = await db.query.players.findMany();
+    const allPlayers = await db.query.players.findMany({
+      where: eq(players.userId, req.user!.id),
+    });
     res.json(allPlayers);
   });
 
   app.post("/api/players", requireAuth, async (req, res) => {
     const { name } = req.body;
-    const newPlayer = await db.insert(players).values({ name }).returning();
+    const newPlayer = await db
+      .insert(players)
+      .values({ 
+        name,
+        userId: req.user!.id
+      })
+      .returning();
     res.json(newPlayer[0]);
   });
 
@@ -35,22 +43,47 @@ export function registerRoutes(app: Express): Server {
     const { name } = req.body;
     const playerId = parseInt(req.params.id);
 
+    // First verify the player belongs to the user
+    const player = await db.query.players.findFirst({
+      where: eq(players.id, playerId),
+    });
+
+    if (!player) {
+      res.status(404).json({ message: "Player not found" });
+      return;
+    }
+
+    if (player.userId !== req.user!.id) {
+      res.status(403).json({ message: "Not authorized to modify this player" });
+      return;
+    }
+
     const updatedPlayer = await db
       .update(players)
       .set({ name })
       .where(eq(players.id, playerId))
       .returning();
 
-    if (updatedPlayer.length === 0) {
-      res.status(404).json({ message: "Player not found" });
-      return;
-    }
-
     res.json(updatedPlayer[0]);
   });
 
   app.delete("/api/players/:id", requireAuth, async (req, res) => {
     const playerId = parseInt(req.params.id);
+
+    // First verify the player belongs to the user
+    const player = await db.query.players.findFirst({
+      where: eq(players.id, playerId),
+    });
+
+    if (!player) {
+      res.status(404).json({ message: "Player not found" });
+      return;
+    }
+
+    if (player.userId !== req.user!.id) {
+      res.status(403).json({ message: "Not authorized to delete this player" });
+      return;
+    }
 
     const playerTournaments = await db.query.tournamentPlayers.findMany({
       where: eq(tournamentPlayers.playerId, playerId),
@@ -213,7 +246,7 @@ export function registerRoutes(app: Express): Server {
     res.json({ message: "Tournament deleted successfully" });
   });
 
-  app.post("/api/tournaments/:id/start", async (req, res) => {
+  app.post("/api/tournaments/:id/start", requireAuth, async (req, res) => {
     const tournamentId = parseInt(req.params.id);
     try {
       const tournamentData = await db.query.tournaments.findFirst({
@@ -229,6 +262,11 @@ export function registerRoutes(app: Express): Server {
 
       if (!tournamentData) {
         return res.status(404).json({ message: "Tournament not found" });
+      }
+
+      // Verify tournament belongs to user
+      if (tournamentData.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to start this tournament" });
       }
 
       // Filter out any null values and ensure we have valid player IDs
@@ -353,9 +391,25 @@ export function registerRoutes(app: Express): Server {
     res.json({ message: "Tournament players updated successfully" });
   });
 
-  app.post("/api/games/:id/score", async (req, res) => {
+  app.post("/api/games/:id/score", requireAuth, async (req, res) => {
     const { team1Score, team2Score } = req.body;
     const gameId = parseInt(req.params.id);
+
+    // Verify the game belongs to a tournament owned by the user
+    const game = await db.query.games.findFirst({
+      where: eq(games.id, gameId),
+      with: {
+        tournament: true,
+      },
+    });
+
+    if (!game) {
+      return res.status(404).json({ message: "Game not found" });
+    }
+
+    if (game.tournament.userId !== req.user!.id) {
+      return res.status(403).json({ message: "Not authorized to update this game" });
+    }
 
     const updatedGame = await db
       .update(games)

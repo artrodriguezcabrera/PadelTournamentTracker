@@ -12,6 +12,7 @@ export const users = pgTable("users", {
 export const players = pgTable("players", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -49,6 +50,7 @@ export const games = pgTable("games", {
 // Define relations
 export const userRelations = relations(users, ({ many }) => ({
   tournaments: many(tournaments),
+  players: many(players),
 }));
 
 export const tournamentRelations = relations(tournaments, ({ one, many }) => ({
@@ -60,7 +62,11 @@ export const tournamentRelations = relations(tournaments, ({ one, many }) => ({
   games: many(games),
 }));
 
-export const playerRelations = relations(players, ({ many }) => ({
+export const playerRelations = relations(players, ({ one, many }) => ({
+  user: one(users, {
+    fields: [players.userId],
+    references: [users.id],
+  }),
   tournamentPlayers: many(tournamentPlayers),
 }));
 
