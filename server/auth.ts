@@ -1,18 +1,18 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Express } from "express";
+import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { users, insertUserSchema, type User } from "@db/schema";
+import { users, type User } from "@db/schema";
 import { db, pool } from "@db";
 import { eq } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 
 declare global {
   namespace Express {
-    interface User extends User {}
+    interface User extends Omit<User, 'password'> {}
   }
 }
 
@@ -39,6 +39,9 @@ export function setupAuth(app: Express) {
     resave: false,
     saveUninitialized: false,
     store,
+    cookie: {
+      secure: app.get("env") === "production",
+    },
   };
 
   if (app.get("env") === "production") {
@@ -55,7 +58,8 @@ export function setupAuth(app: Express) {
       if (!user || !(await comparePasswords(password, user.password))) {
         return done(null, false);
       } else {
-        return done(null, user);
+        const { password: _, ...userWithoutPassword } = user;
+        return done(null, userWithoutPassword);
       }
     }),
   );
@@ -63,7 +67,11 @@ export function setupAuth(app: Express) {
   passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
     const [user] = await db
-      .select()
+      .select({
+        id: users.id,
+        email: users.email,
+        createdAt: users.createdAt,
+      })
       .from(users)
       .where(eq(users.id, id))
       .limit(1);
@@ -89,7 +97,11 @@ export function setupAuth(app: Express) {
         ...result.data,
         password: await hashPassword(result.data.password),
       })
-      .returning();
+      .returning({
+        id: users.id,
+        email: users.email,
+        createdAt: users.createdAt,
+      });
 
     req.login(user, (err) => {
       if (err) return next(err);

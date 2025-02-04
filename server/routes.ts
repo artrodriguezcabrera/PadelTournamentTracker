@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { tournaments, players, games, tournamentPlayers, users } from "@db/schema";
@@ -12,7 +12,7 @@ export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
   // Middleware to check if user is authenticated
-  const requireAuth = (req: Express.Request, res: Express.Response, next: Express.NextFunction) => {
+  const requireAuth = (req: Request, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
