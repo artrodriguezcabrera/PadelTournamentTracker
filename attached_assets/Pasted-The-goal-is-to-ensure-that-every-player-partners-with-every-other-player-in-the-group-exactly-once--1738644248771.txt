@@ -1,0 +1,39 @@
+The goal is to ensure that every player partners with every other player in the group exactly once, while also taking into account the number of courts available. Here are the specific requirements:
+Total Players: The total number of players is variable, denoted as N, where N is an integer greater than or equal to 4 (i.e., N >= 4). For example, in one scenario, N = 8.
+Courts Available: The number of courts available is variable, denoted as C, where C is a positive integer (i.e., C >= 1). For example, in one scenario, C = 2.
+Partners per Player: Each player must partner with every other player exactly once. Since a player cannot partner with themselves, each player will have N - 1 possible partners.
+Matches per Round: In each round, a player will partner with one other player and play one match. The number of matches that can occur simultaneously is limited by the number of courts available (C). Each court can host one doubles match (involving 4 players: 2 teams of 2).
+Rounds Required: The goal is to calculate the minimum number of rounds required (x) to ensure that:
+Every player has partnered with every other player exactly once.
+All courts are utilized as efficiently as possible in each round.
+The total number of rounds is minimized.
+Every player plays the same total number of games at the end of the tournament.
+General Formula: For any N >= 4 and C >= 1, the number of rounds required (x) should be calculated such that:
+The total number of unique partnerships is N * (N - 1) / 2 (since each partnership is unique and shared between two players).
+The number of matches per round is equal to the number of courts (C).
+The minimum number of rounds is the ceiling of the total number of unique partnerships divided by the number of matches per round:  Copy  x = ceil((N * (N - 1) / 2) / C) 
+Output: The AI should provide:
+The number of rounds required (x) for a given N and C.
+A general formula or algorithm to calculate x for any N >= 4 and C >= 1.
+A schedule or pairing plan for each round to ensure:
+No two players partner more than once.
+All courts are utilized efficiently in each round.
+Every player plays the same total number of games.
+Please write code or provide a solution that follows this logic and works for any N >= 4 and C >= 1. The solution should be scalable and efficient."
+
+Example Scenarios to Include:
+Scenario 1: N = 8, C = 2.
+Total unique partnerships: 8 * 7 / 2 = 28.
+Matches per round: 2.
+Rounds required: ceil(28 / 2) = 14.
+Expected output: x = 14 rounds.
+Scenario 2: N = 6, C = 1.
+Total unique partnerships: 6 * 5 / 2 = 15.
+Matches per round: 1.
+Rounds required: ceil(15 / 1) = 15.
+Expected output: x = 15 rounds.
+Scenario 3: N = 9, C = 3.
+Total unique partnerships: 9 * 8 / 2 = 36.
+Matches per round: 3.
+Rounds required: ceil(36 / 3) = 12.
+Expected output: x = 12 rounds.

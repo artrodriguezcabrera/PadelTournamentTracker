@@ -356,16 +356,19 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   // Calculate total required partnerships
   const totalPartnerships = (N * (N - 1)) / 2;
   // Calculate required rounds
-  const requiredRounds = Math.ceil(totalPartnerships / numCourts);
-  // Calculate max games per player to ensure even distribution
-  const maxGamesPerPlayer = Math.ceil((requiredRounds * numCourts * 4) / N);
+  const requiredRounds = Math.ceil(totalPartnerships / (numCourts * 2)); // Each match creates 2 partnerships
+  // Calculate target games per player for even distribution
+  const targetGamesPerPlayer = Math.ceil((requiredRounds * numCourts * 4) / N);
+
+  console.log(`Generating schedule for ${N} players on ${numCourts} courts`);
+  console.log(`Total partnerships needed: ${totalPartnerships}`);
+  console.log(`Required rounds: ${requiredRounds}`);
+  console.log(`Target games per player: ${targetGamesPerPlayer}`);
 
   const matches: Match[] = [];
   const playerGamesCount = new Map<number, number>();
   const usedPairings = new Set<string>();
   let round = 1;
-  let attempts = 0;
-  const maxAttempts = 1000; // Increased for better chance of finding valid combinations
 
   // Initialize game counts
   playerIds.forEach(id => playerGamesCount.set(id, 0));
@@ -374,106 +377,122 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   const getPairingKey = (p1: number, p2: number) =>
     [p1, p2].sort((a, b) => a - b).join(',');
 
-  console.log(`Generating schedule for ${N} players on ${numCourts} courts`);
-  console.log(`Required rounds: ${requiredRounds}`);
-  console.log(`Total partnerships needed: ${totalPartnerships}`);
-  console.log(`Max games per player: ${maxGamesPerPlayer}`);
-
-  while (round <= requiredRounds && attempts < maxAttempts) {
-    attempts++;
-
-    // Track players used in this round
+  while (round <= requiredRounds) {
     const playersUsedInRound = new Set<number>();
-    let roundMatches = [];
+    const roundMatches: Match[] = [];
+    const skippedCourts = new Set<number>();
 
-    // Try to fill ALL courts in this round
-    let currentCourt = 1;
-    let skippedCourts = new Set<number>();
-    let failedAttempts = 0;
-    const maxFailedAttempts = 3;
-
-    while (currentCourt <= numCourts || skippedCourts.size > 0) {
-      // If we've tried all courts, go back to skipped ones
-      if (currentCourt > numCourts && skippedCourts.size > 0) {
+    // Try to fill ALL courts before proceeding to next round
+    for (let currentCourt = 1; currentCourt <= numCourts || skippedCourts.size > 0;) {
+      // If we've processed all courts, try skipped ones
+      if (currentCourt > numCourts) {
+        if (skippedCourts.size === 0) break;
         currentCourt = Array.from(skippedCourts)[0];
         skippedCourts.delete(currentCourt);
       }
 
-      const remainingPlayers = playerIds
-        .filter(id => !playersUsedInRound.has(id) && (playerGamesCount.get(id) || 0) < maxGamesPerPlayer)
+      // Get available players for this match
+      const availablePlayers = playerIds
+        .filter(id => 
+          !playersUsedInRound.has(id) && 
+          (playerGamesCount.get(id) || 0) < targetGamesPerPlayer
+        )
         .sort((a, b) => (playerGamesCount.get(a) || 0) - (playerGamesCount.get(b) || 0));
 
-      // If we don't have enough players for even one more match, break
-      if (remainingPlayers.length < 4) {
-        break;
-      }
-
-      // Try to create a valid match for this court
-      let match = null;
-      let attempts = 0;
-      const maxAttempts = 10;
-
-      while (!match && attempts < maxAttempts) {
-        match = createValidMatch(
-          remainingPlayers,
-          usedPairings,
-          getPairingKey
-        );
-        attempts++;
-      }
-
-      if (!match) {
-        failedAttempts++;
-        if (failedAttempts >= maxFailedAttempts) {
-          // If this is the first court and we have no matches, end the round
-          if (currentCourt === 1 && roundMatches.length === 0) {
-            break;
-          }
-          // If we've tried everything, including skipped courts, end the round
-          if (skippedCourts.size === 0 && currentCourt === numCourts) {
-            break;
-          }
+      if (availablePlayers.length < 4) {
+        if (currentCourt === 1 && roundMatches.length === 0) {
+          // If we can't even fill first court, we're done
+          return matches;
         }
-        // Add current court to skipped and try next one
+        // Skip this court and try next
         skippedCourts.add(currentCourt);
         currentCourt++;
         continue;
       }
 
-      // Record the match for this court
+      // Try to create a valid match
+      let match: number[] | null = null;
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      while (!match && attempts < maxAttempts) {
+        // Try to find 4 players that haven't partnered before
+        const remainingPlayers = [...availablePlayers];
+        const team: number[] = [];
+
+        // Select first player (least games played)
+        if (remainingPlayers.length > 0) {
+          team.push(remainingPlayers.shift()!);
+
+          // Find partner for first player
+          for (let i = 0; i < remainingPlayers.length; i++) {
+            if (!usedPairings.has(getPairingKey(team[0], remainingPlayers[i]))) {
+              team.push(remainingPlayers[i]);
+              remainingPlayers.splice(i, 1);
+              break;
+            }
+          }
+
+          // Select first player for second team
+          if (team.length === 2 && remainingPlayers.length > 0) {
+            team.push(remainingPlayers.shift()!);
+
+            // Find partner for third player
+            for (let i = 0; i < remainingPlayers.length; i++) {
+              if (!usedPairings.has(getPairingKey(team[2], remainingPlayers[i]))) {
+                team.push(remainingPlayers[i]);
+                break;
+              }
+            }
+          }
+
+          if (team.length === 4) {
+            match = team;
+          }
+        }
+
+        attempts++;
+      }
+
+      if (!match) {
+        if (currentCourt === 1 && roundMatches.length === 0) {
+          // If we can't create any valid matches, we're done
+          return matches;
+        }
+        // Skip this court and try next
+        skippedCourts.add(currentCourt);
+        currentCourt++;
+        continue;
+      }
+
+      // Record the match
       roundMatches.push({
         players: match,
         round,
         court: currentCourt
       });
 
-      // Mark these players as used for this round
-      match.forEach(id => playersUsedInRound.add(id));
+      // Mark players as used and update counts
+      match.forEach(id => {
+        playersUsedInRound.add(id);
+        playerGamesCount.set(id, (playerGamesCount.get(id) || 0) + 1);
+      });
+
+      // Record partnerships
+      usedPairings.add(getPairingKey(match[0], match[1]));
+      usedPairings.add(getPairingKey(match[2], match[3]));
 
       currentCourt++;
     }
 
-    // If we couldn't create any matches for this round, we're done
+    // If we couldn't create any matches in this round, we're done
     if (roundMatches.length === 0) {
-      console.log("Could not create any matches in round", round);
+      console.log(`Could not create any matches in round ${round}`);
       break;
     }
 
-    // Process all matches for this round
-    roundMatches.forEach(match => {
-      // Record partnerships
-      usedPairings.add(getPairingKey(match.players[0], match.players[1]));
-      usedPairings.add(getPairingKey(match.players[2], match.players[3]));
-
-      // Update game counts
-      match.players.forEach(id => {
-        playerGamesCount.set(id, (playerGamesCount.get(id) || 0) + 1);
-      });
-
-      // Add to final schedule
-      matches.push(match);
-    });
-
+    // Add all matches from this round to final schedule
+    matches.push(...roundMatches);
     console.log(`Round ${round}: Created ${roundMatches.length} matches`);
     round++;
   }
@@ -482,54 +501,19 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     throw new Error("Could not generate any valid matches");
   }
 
-  // Validate player game counts
+  // Log final game distribution
+  console.log("\nFinal game distribution:");
   for (const [playerId, games] of playerGamesCount.entries()) {
-    console.log(`Player ${playerId} played ${games} games`);
-    if (Math.abs(games - maxGamesPerPlayer) > 1) {
-      console.warn(`Player ${playerId} has uneven game count: ${games} vs target ${maxGamesPerPlayer}`);
+    console.log(`Player ${playerId}: ${games} games`);
+    if (Math.abs(games - targetGamesPerPlayer) > 1) {
+      console.warn(`Warning: Player ${playerId} has uneven game count: ${games} vs target ${targetGamesPerPlayer}`);
     }
   }
 
-  // Sort matches first by round, then by court number
   return matches.sort((a, b) => {
     if (a.round !== b.round) return a.round - b.round;
     return a.court - b.court;
   });
-}
-
-// Helper function to create a valid match
-function createValidMatch(
-  availablePlayers: number[],
-  usedPairings: Set<string>,
-  getPairingKey: (p1: number, p2: number) => string
-): number[] | null {
-  for (let i = 0; i < availablePlayers.length - 3; i++) {
-    for (let j = i + 1; j < availablePlayers.length - 2; j++) {
-      // Check if first pair has played together
-      if (usedPairings.has(getPairingKey(availablePlayers[i], availablePlayers[j]))) {
-        continue;
-      }
-
-      for (let k = j + 1; k < availablePlayers.length - 1; k++) {
-        for (let l = k + 1; l < availablePlayers.length; l++) {
-          // Check if second pair has played together
-          if (usedPairings.has(getPairingKey(availablePlayers[k], availablePlayers[l]))) {
-            continue;
-          }
-
-          // Return valid match
-          return [
-            availablePlayers[i],
-            availablePlayers[j],
-            availablePlayers[k],
-            availablePlayers[l]
-          ];
-        }
-      }
-    }
-  }
-
-  return null;
 }
 
 function generatePossibleTeamCombinations(players: number[]): number[][] {
