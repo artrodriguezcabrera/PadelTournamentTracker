@@ -164,11 +164,6 @@ export function registerRoutes(app: Express): Server {
       return;
     }
 
-    if (tournament.isActive) {
-      res.status(400).json({ message: "Cannot delete an active tournament" });
-      return;
-    }
-
     await db.transaction(async (tx) => {
       // Delete tournament players first due to foreign key constraint
       await tx
