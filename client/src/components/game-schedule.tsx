@@ -102,17 +102,39 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
     });
   };
 
-  // Group games by round
-  const gamesByRound = games.reduce((acc, game) => {
-    const round = acc.get(game.roundNumber) || new Map();
-    const courtGames = round.get(game.courtNumber) || [];
-    round.set(game.courtNumber, [...courtGames, game]);
-    return acc.set(game.roundNumber, round);
-  }, new Map<number, Map<number, GameWithPlayers[]>>());
+  // Group games by round and court, preserving original order
+  const gamesByRound = new Map<number, Map<number, GameWithPlayers[]>>();
+  const roundOrder: number[] = [];
+  const courtOrderByRound = new Map<number, number[]>();
+
+  // First, collect all unique rounds and courts in their original order
+  games.forEach(game => {
+    if (!roundOrder.includes(game.roundNumber)) {
+      roundOrder.push(game.roundNumber);
+    }
+
+    const courtsForRound = courtOrderByRound.get(game.roundNumber) || [];
+    if (!courtsForRound.includes(game.courtNumber)) {
+      courtsForRound.push(game.courtNumber);
+      courtOrderByRound.set(game.roundNumber, courtsForRound);
+    }
+  });
+
+  // Then group games while maintaining the order
+  games.forEach(game => {
+    if (!gamesByRound.has(game.roundNumber)) {
+      gamesByRound.set(game.roundNumber, new Map());
+    }
+    const roundMap = gamesByRound.get(game.roundNumber)!;
+    if (!roundMap.has(game.courtNumber)) {
+      roundMap.set(game.courtNumber, []);
+    }
+    roundMap.get(game.courtNumber)!.push(game);
+  });
 
   return (
     <div className="space-y-8">
-      {Array.from(gamesByRound.entries()).map(([roundNumber, courts]) => (
+      {roundOrder.map((roundNumber) => (
         <motion.div 
           key={roundNumber} 
           className="space-y-4"
@@ -126,13 +148,13 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
             Round {roundNumber}
           </h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {Array.from(courts.entries()).map(([courtNumber, courtGames]) => (
+            {courtOrderByRound.get(roundNumber)?.map((courtNumber) => (
               <div key={`court-${roundNumber}-${courtNumber}`} className="space-y-4">
                 <h3 className="text-lg font-semibold text-muted-foreground">
                   Court {courtNumber}
                 </h3>
                 <AnimatePresence>
-                  {courtGames.map((game) => (
+                  {gamesByRound.get(roundNumber)?.get(courtNumber)?.map((game) => (
                     <motion.div
                       key={`game-${game.id}`}
                       layoutId={`game-${game.id}`}
