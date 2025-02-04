@@ -42,17 +42,11 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
       return response.json();
     },
     onMutate: async ({ gameId, team1Score, team2Score }) => {
-      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: [`/api/tournaments/${tournamentId}`] });
-
-      // Snapshot the previous tournament data
       const previousTournament = queryClient.getQueryData([`/api/tournaments/${tournamentId}`]);
 
-      // Optimistically update tournament data
       queryClient.setQueryData([`/api/tournaments/${tournamentId}`], (old: any) => {
         if (!old || !old.games) return old;
-
-        // Create a new games array with the updated game, maintaining the original order
         const newGames = old.games.map((game: GameWithPlayers) => {
           if (game.id === gameId) {
             return {
@@ -64,8 +58,6 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
           }
           return game;
         });
-
-        // Return a new tournament object with all properties preserved
         return {
           ...old,
           games: newGames,
@@ -100,7 +92,6 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
       },
     });
 
-    // Automatically submit the score when both teams have scores
     updateScore.mutate({
       gameId,
       team1Score: team === 'team1' ? points : remainingPoints,
@@ -138,16 +129,12 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
                           <div className="font-medium">
                             {game.player1.name} & {game.player2.name}
                           </div>
-                          {game.isComplete ? (
-                            <div className="text-xl font-bold">{game.team1Score}</div>
-                          ) : (
-                            <PointSelector
-                              maxPoints={pointSystem}
-                              value={scores[game.id]?.team1 || ""}
-                              onChange={(points) => handleScoreChange(game.id, 'team1', points)}
-                              disabled={updateScore.isPending}
-                            />
-                          )}
+                          <PointSelector
+                            maxPoints={pointSystem}
+                            value={(game.isComplete ? game.team1Score : scores[game.id]?.team1) || ""}
+                            onChange={(points) => handleScoreChange(game.id, 'team1', points)}
+                            disabled={updateScore.isPending}
+                          />
                         </div>
 
                         <Separator className="my-2" />
@@ -156,16 +143,12 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
                           <div className="font-medium">
                             {game.player3.name} & {game.player4.name}
                           </div>
-                          {game.isComplete ? (
-                            <div className="text-xl font-bold">{game.team2Score}</div>
-                          ) : (
-                            <PointSelector
-                              maxPoints={pointSystem}
-                              value={scores[game.id]?.team2 || ""}
-                              onChange={(points) => handleScoreChange(game.id, 'team2', points)}
-                              disabled={updateScore.isPending}
-                            />
-                          )}
+                          <PointSelector
+                            maxPoints={pointSystem}
+                            value={(game.isComplete ? game.team2Score : scores[game.id]?.team2) || ""}
+                            onChange={(points) => handleScoreChange(game.id, 'team2', points)}
+                            disabled={updateScore.isPending}
+                          />
                         </div>
                       </div>
                     </CardContent>
