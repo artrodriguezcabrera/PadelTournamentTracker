@@ -375,6 +375,9 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       break;
     }
 
+    // Track players used in this round
+    const playersUsedInRound = new Set<number>();
+
     // Get players who haven't played 8 games yet, sorted by games played
     const availablePlayers = playerIds
       .filter(id => (playerGamesCount.get(id) || 0) < 8)
@@ -386,15 +389,22 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     }
 
     // Create matches for this round
-    for (let court = 1; court <= numCourts && availablePlayers.length >= 4; court++) {
+    for (let court = 1; court <= numCourts; court++) {
       // Find players for this match prioritizing those who've played fewer games
+      // and haven't played in this round yet
+      const availableForThisGame = availablePlayers.filter(id => !playersUsedInRound.has(id));
+
+      if (availableForThisGame.length < 4) {
+        continue; // Skip this court if not enough players available
+      }
+
       let matchPlayers: number[] = [];
 
       // Try to find team 1 (first partnership)
-      for (let i = 0; i < availablePlayers.length - 1; i++) {
-        for (let j = i + 1; j < availablePlayers.length; j++) {
-          const p1 = availablePlayers[i];
-          const p2 = availablePlayers[j];
+      for (let i = 0; i < availableForThisGame.length - 1; i++) {
+        for (let j = i + 1; j < availableForThisGame.length; j++) {
+          const p1 = availableForThisGame[i];
+          const p2 = availableForThisGame[j];
 
           // Skip if this partnership has already played together
           if (!usedPairings.has(getPairingKey(p1, p2))) {
@@ -409,7 +419,10 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       if (matchPlayers.length !== 2) continue;
 
       // Find team 2 (second partnership)
-      const remainingPlayers = availablePlayers.filter(p => !matchPlayers.includes(p));
+      const remainingPlayers = availableForThisGame.filter(p => 
+        !matchPlayers.includes(p) && !playersUsedInRound.has(p)
+      );
+
       for (let i = 0; i < remainingPlayers.length - 1; i++) {
         for (let j = i + 1; j < remainingPlayers.length; j++) {
           const p3 = remainingPlayers[i];
@@ -430,6 +443,9 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
         usedPairings.add(getPairingKey(matchPlayers[0], matchPlayers[1]));
         usedPairings.add(getPairingKey(matchPlayers[2], matchPlayers[3]));
 
+        // Mark these players as used in this round
+        matchPlayers.forEach(id => playersUsedInRound.add(id));
+
         // Update game counts
         matchPlayers.forEach(id => {
           playerGamesCount.set(id, (playerGamesCount.get(id) || 0) + 1);
@@ -444,8 +460,10 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       }
     }
 
-    // Move to next round
-    round++;
+    // Move to next round if we created at least one match
+    if (Array.from(playersUsedInRound).length > 0) {
+      round++;
+    }
 
     // Safety check to prevent infinite loops
     if (round > 50) {
