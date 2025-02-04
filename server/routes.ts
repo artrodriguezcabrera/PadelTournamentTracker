@@ -352,13 +352,18 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     throw new Error("Not enough players to generate matches");
   }
 
+  const N = playerIds.length;
+  // Calculate total required partnerships
+  const totalPartnerships = (N * (N - 1)) / 2;
+  // Calculate required rounds
+  const requiredRounds = Math.ceil(totalPartnerships / numCourts);
+
   const matches: Match[] = [];
   const playerGamesCount = new Map<number, number>();
   const usedPairings = new Set<string>();
   let round = 1;
-  const maxGamesPerPlayer = 8;
-  const maxAttempts = 100;
   let attempts = 0;
+  const maxAttempts = 1000; // Increased for better chance of finding valid combinations
 
   // Initialize game counts
   playerIds.forEach(id => playerGamesCount.set(id, 0));
@@ -367,7 +372,11 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   const getPairingKey = (p1: number, p2: number) =>
     [p1, p2].sort((a, b) => a - b).join(',');
 
-  while (attempts < maxAttempts) {
+  console.log(`Generating schedule for ${N} players on ${numCourts} courts`);
+  console.log(`Required rounds: ${requiredRounds}`);
+  console.log(`Total partnerships needed: ${totalPartnerships}`);
+
+  while (round <= requiredRounds && attempts < maxAttempts) {
     attempts++;
 
     // Check if all players have played maximum games
@@ -454,10 +463,14 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       currentCourt++;
     }
 
-    // If we couldn't create any matches for this round, we're done
+    // Validate this round
     if (roundMatches.length === 0) {
-      console.log("Could not create any matches in round", round);
-      break;
+      attempts++;
+      console.log(`Failed to create matches for round ${round}, attempt ${attempts}`);
+      if (attempts >= maxAttempts) {
+        throw new Error(`Could not generate valid schedule after ${maxAttempts} attempts`);
+      }
+      continue;
     }
 
     // Process all matches for this round
@@ -477,10 +490,20 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
     console.log(`Round ${round}: Created ${roundMatches.length} matches`);
     round++;
+    attempts = 0; // Reset attempts for next round
   }
 
+  // Validate final schedule
   if (matches.length === 0) {
     throw new Error("Could not generate any valid matches");
+  }
+
+  // Validate player game counts
+  const targetGames = Math.floor((requiredRounds * numCourts * 4) / N);
+  for (const [playerId, games] of playerGamesCount.entries()) {
+    if (Math.abs(games - targetGames) > 1) {
+      console.warn(`Player ${playerId} has uneven game count: ${games} vs target ${targetGames}`);
+    }
   }
 
   // Sort matches first by round, then by court number
