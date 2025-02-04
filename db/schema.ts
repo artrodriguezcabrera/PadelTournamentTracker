@@ -2,6 +2,13 @@ import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const players = pgTable("players", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -14,6 +21,7 @@ export const tournaments = pgTable("tournaments", {
   pointSystem: integer("point_system").notNull(), // 16, 24, or 32
   courts: integer("courts").notNull().default(1),
   isActive: boolean("is_active").default(false),
+  userId: integer("user_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -39,7 +47,15 @@ export const games = pgTable("games", {
 });
 
 // Define relations
-export const tournamentRelations = relations(tournaments, ({ many }) => ({
+export const userRelations = relations(users, ({ many }) => ({
+  tournaments: many(tournaments),
+}));
+
+export const tournamentRelations = relations(tournaments, ({ one, many }) => ({
+  user: one(users, {
+    fields: [tournaments.userId],
+    references: [users.id],
+  }),
   tournamentPlayers: many(tournamentPlayers),
   games: many(games),
 }));
@@ -82,6 +98,9 @@ export const gameRelations = relations(games, ({ one }) => ({
   }),
 }));
 
+// Zod schemas
+export const insertUserSchema = createInsertSchema(users);
+export const selectUserSchema = createSelectSchema(users);
 export const insertPlayerSchema = createInsertSchema(players);
 export const selectPlayerSchema = createSelectSchema(players);
 export const insertTournamentSchema = createInsertSchema(tournaments);
@@ -89,6 +108,8 @@ export const selectTournamentSchema = createSelectSchema(tournaments);
 export const insertGameSchema = createInsertSchema(games);
 export const selectGameSchema = createSelectSchema(games);
 
+// Types
+export type User = typeof users.$inferSelect;
 export type Player = typeof players.$inferSelect;
 export type Tournament = typeof tournaments.$inferSelect;
 export type Game = typeof games.$inferSelect;

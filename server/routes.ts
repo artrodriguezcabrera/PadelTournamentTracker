@@ -3,23 +3,35 @@ import { createServer, type Server } from "http";
 import { db } from "@db";
 import { tournaments, players, games, tournamentPlayers } from "@db/schema";
 import { eq } from "drizzle-orm";
+import { setupAuth } from "./auth";
 
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
 
+  // Setup authentication routes
+  setupAuth(app);
+
+  // Middleware to check if user is authenticated
+  const requireAuth = (req: Express.Request, res: Express.Response, next: Express.NextFunction) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    next();
+  };
+
   // Player routes
-  app.get("/api/players", async (req, res) => {
+  app.get("/api/players", requireAuth, async (req, res) => {
     const allPlayers = await db.query.players.findMany();
     res.json(allPlayers);
   });
 
-  app.post("/api/players", async (req, res) => {
+  app.post("/api/players", requireAuth, async (req, res) => {
     const { name } = req.body;
     const newPlayer = await db.insert(players).values({ name }).returning();
     res.json(newPlayer[0]);
   });
 
-  app.patch("/api/players/:id", async (req, res) => {
+  app.patch("/api/players/:id", requireAuth, async (req, res) => {
     const { name } = req.body;
     const playerId = parseInt(req.params.id);
 
@@ -37,10 +49,9 @@ export function registerRoutes(app: Express): Server {
     res.json(updatedPlayer[0]);
   });
 
-  app.delete("/api/players/:id", async (req, res) => {
+  app.delete("/api/players/:id", requireAuth, async (req, res) => {
     const playerId = parseInt(req.params.id);
 
-    // Check if player is part of any tournament
     const playerTournaments = await db.query.tournamentPlayers.findMany({
       where: eq(tournamentPlayers.playerId, playerId),
     });
@@ -57,8 +68,9 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Tournament routes
-  app.get("/api/tournaments", async (req, res) => {
+  app.get("/api/tournaments", requireAuth, async (req, res) => {
     const allTournaments = await db.query.tournaments.findMany({
+      where: eq(tournaments.userId, req.user!.id),
       with: {
         tournamentPlayers: {
           with: {
@@ -70,7 +82,7 @@ export function registerRoutes(app: Express): Server {
     res.json(allTournaments);
   });
 
-  app.get("/api/tournaments/:id", async (req, res) => {
+  app.get("/api/tournaments/:id", requireAuth, async (req, res) => {
     const tournament = await db.query.tournaments.findFirst({
       where: eq(tournaments.id, parseInt(req.params.id)),
       with: {
@@ -94,26 +106,34 @@ export function registerRoutes(app: Express): Server {
       res.status(404).json({ message: "Tournament not found" });
       return;
     }
+
+    if (tournament.userId !== req.user!.id) {
+      res.status(403).json({ message: "Not authorized to view this tournament" });
+      return;
+    }
+
     res.json(tournament);
   });
 
-  app.post("/api/tournaments", async (req, res) => {
+  app.post("/api/tournaments", requireAuth, async (req, res) => {
     const { name, pointSystem, courts, playerIds } = req.body;
 
-    // Ensure we have at least 4 players
     if (!playerIds || playerIds.length < 4) {
       res.status(400).json({ message: "At least 4 players are required for a tournament" });
       return;
     }
 
-    // Create tournament with players
     const newTournament = await db.transaction(async (tx) => {
       const [tournament] = await tx
         .insert(tournaments)
-        .values({ name, pointSystem, courts })
+        .values({ 
+          name, 
+          pointSystem, 
+          courts,
+          userId: req.user!.id
+        })
         .returning();
 
-      // Insert tournament players
       await tx.insert(tournamentPlayers).values(
         playerIds.map((playerId: number) => ({
           tournamentId: tournament.id,
@@ -127,7 +147,7 @@ export function registerRoutes(app: Express): Server {
     res.json(newTournament);
   });
 
-  app.patch("/api/tournaments/:id", async (req, res) => {
+  app.patch("/api/tournaments/:id", requireAuth, async (req, res) => {
     const tournamentId = parseInt(req.params.id);
     const { name, pointSystem, courts } = req.body;
 
@@ -137,6 +157,11 @@ export function registerRoutes(app: Express): Server {
 
     if (!tournament) {
       res.status(404).json({ message: "Tournament not found" });
+      return;
+    }
+
+    if (tournament.userId !== req.user!.id) {
+      res.status(403).json({ message: "Not authorized to modify this tournament" });
       return;
     }
 
@@ -154,7 +179,7 @@ export function registerRoutes(app: Express): Server {
     res.json(updatedTournament[0]);
   });
 
-  app.delete("/api/tournaments/:id", async (req, res) => {
+  app.delete("/api/tournaments/:id", requireAuth, async (req, res) => {
     const tournamentId = parseInt(req.params.id);
 
     const tournament = await db.query.tournaments.findFirst({
@@ -166,18 +191,20 @@ export function registerRoutes(app: Express): Server {
       return;
     }
 
+    if (tournament.userId !== req.user!.id) {
+      res.status(403).json({ message: "Not authorized to delete this tournament" });
+      return;
+    }
+
     await db.transaction(async (tx) => {
-      // Delete tournament players first due to foreign key constraint
       await tx
         .delete(tournamentPlayers)
         .where(eq(tournamentPlayers.tournamentId, tournamentId));
 
-      // Delete tournament games
       await tx
         .delete(games)
         .where(eq(games.tournamentId, tournamentId));
 
-      // Delete tournament
       await tx
         .delete(tournaments)
         .where(eq(tournaments.id, tournamentId));
@@ -279,7 +306,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.patch("/api/tournaments/:id/players", async (req, res) => {
+  app.patch("/api/tournaments/:id/players", requireAuth, async (req, res) => {
     const tournamentId = parseInt(req.params.id);
     const { playerIds } = req.body;
 
@@ -295,6 +322,11 @@ export function registerRoutes(app: Express): Server {
 
     if (!tournament) {
       res.status(404).json({ message: "Tournament not found" });
+      return;
+    }
+
+    if (tournament.userId !== req.user!.id) {
+      res.status(403).json({ message: "Not authorized to modify players in this tournament" });
       return;
     }
 
