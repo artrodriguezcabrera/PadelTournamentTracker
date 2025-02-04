@@ -357,6 +357,8 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   const totalPartnerships = (N * (N - 1)) / 2;
   // Calculate required rounds
   const requiredRounds = Math.ceil(totalPartnerships / numCourts);
+  // Calculate max games per player to ensure even distribution
+  const maxGamesPerPlayer = Math.ceil((requiredRounds * numCourts * 4) / N);
 
   const matches: Match[] = [];
   const playerGamesCount = new Map<number, number>();
@@ -375,27 +377,14 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   console.log(`Generating schedule for ${N} players on ${numCourts} courts`);
   console.log(`Required rounds: ${requiredRounds}`);
   console.log(`Total partnerships needed: ${totalPartnerships}`);
+  console.log(`Max games per player: ${maxGamesPerPlayer}`);
 
   while (round <= requiredRounds && attempts < maxAttempts) {
     attempts++;
 
-    // Check if all players have played maximum games
-    const allPlayersMaxedOut = Array.from(playerGamesCount.values())
-      .every(count => count >= maxGamesPerPlayer);
-
-    if (allPlayersMaxedOut) {
-      console.log("All players have completed maximum games");
-      break;
-    }
-
     // Track players used in this round
     const playersUsedInRound = new Set<number>();
     let roundMatches = [];
-
-    // Get all available players for this round
-    const availablePlayers = playerIds
-      .filter(id => (playerGamesCount.get(id) || 0) < maxGamesPerPlayer)
-      .sort((a, b) => (playerGamesCount.get(a) || 0) - (playerGamesCount.get(b) || 0));
 
     // Try to fill ALL courts in this round
     let currentCourt = 1;
@@ -410,14 +399,16 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
         skippedCourts.delete(currentCourt);
       }
 
-      const remainingPlayers = availablePlayers.filter(id => !playersUsedInRound.has(id));
+      const remainingPlayers = playerIds
+        .filter(id => !playersUsedInRound.has(id) && (playerGamesCount.get(id) || 0) < maxGamesPerPlayer)
+        .sort((a, b) => (playerGamesCount.get(a) || 0) - (playerGamesCount.get(b) || 0));
 
       // If we don't have enough players for even one more match, break
       if (remainingPlayers.length < 4) {
         break;
       }
 
-      // Try a few times to create a valid match for this court
+      // Try to create a valid match for this court
       let match = null;
       let attempts = 0;
       const maxAttempts = 10;
@@ -446,7 +437,6 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
         // Add current court to skipped and try next one
         skippedCourts.add(currentCourt);
         currentCourt++;
-        failedAttempts = 0;
         continue;
       }
 
@@ -490,7 +480,6 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
     console.log(`Round ${round}: Created ${roundMatches.length} matches`);
     round++;
-    attempts = 0; // Reset attempts for next round
   }
 
   // Validate final schedule
@@ -499,10 +488,10 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   }
 
   // Validate player game counts
-  const targetGames = Math.floor((requiredRounds * numCourts * 4) / N);
   for (const [playerId, games] of playerGamesCount.entries()) {
-    if (Math.abs(games - targetGames) > 1) {
-      console.warn(`Player ${playerId} has uneven game count: ${games} vs target ${targetGames}`);
+    console.log(`Player ${playerId} played ${games} games`);
+    if (Math.abs(games - maxGamesPerPlayer) > 1) {
+      console.warn(`Player ${playerId} has uneven game count: ${games} vs target ${maxGamesPerPlayer}`);
     }
   }
 
