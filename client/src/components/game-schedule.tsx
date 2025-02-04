@@ -119,6 +119,7 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
+          layoutId={`round-${roundNumber}`}
         >
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Layers className="h-6 w-6" />
@@ -126,15 +127,15 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
           </h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {Array.from(courts.entries()).map(([courtNumber, courtGames]) => (
-              <div key={courtNumber} className="space-y-4">
+              <div key={`court-${roundNumber}-${courtNumber}`} className="space-y-4">
                 <h3 className="text-lg font-semibold text-muted-foreground">
                   Court {courtNumber}
                 </h3>
                 <AnimatePresence>
                   {courtGames.map((game) => (
                     <motion.div
-                      key={game.id}
-                      layout
+                      key={`game-${game.id}`}
+                      layoutId={`game-${game.id}`}
                       animate={lastUpdated === game.id ? {
                         scale: [1, 1.02, 1],
                         transition: { duration: 0.3 }
