@@ -87,7 +87,7 @@ export default function Home() {
       <div className="container mx-auto py-8">
         <div className="flex flex-col gap-4 mb-8">
           <div className="flex justify-between items-center">
-            <h1 className="text-4xl font-bold">Padel Tournaments</h1>
+            <h1 className="text-4xl font-bold">Padel Bros</h1>
             <UserNav />
           </div>
           <div className="flex flex-wrap gap-2">

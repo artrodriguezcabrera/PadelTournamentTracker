@@ -60,7 +60,7 @@ export default function AuthPage() {
         <div className="w-full max-w-sm">
           <Card>
             <CardHeader>
-              <CardTitle>Welcome to Padel Tournaments</CardTitle>
+              <CardTitle>Welcome to Padel Bros</CardTitle>
               <CardDescription>
                 Sign in to your account or create a new one
               </CardDescription>
@@ -158,7 +158,7 @@ export default function AuthPage() {
         <div className="absolute inset-0 flex items-center justify-center p-8">
           <div className="max-w-2xl">
             <h2 className="text-4xl font-bold mb-4">
-              Manage Your Padel Tournaments
+              Manage Your Padel Games
             </h2>
             <p className="text-lg text-muted-foreground">
               Create and manage tournaments, track player performance, and organize matches
