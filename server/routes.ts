@@ -382,53 +382,52 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     // Track players used in this round
     const playersUsedInRound = new Set<number>();
     let roundMatches = [];
+    let retryCount = 0;
+    const maxRetries = 3; // Allow multiple attempts to fill all courts
 
-    // Try to create matches for all courts in this round
-    for (let court = 1; court <= numCourts; court++) {
-      // Get players who haven't played in this round and haven't maxed out their games
-      const availablePlayers = playerIds
-        .filter(id => 
-          !playersUsedInRound.has(id) && 
-          (playerGamesCount.get(id) || 0) < maxGamesPerPlayer
-        )
-        .sort((a, b) => (playerGamesCount.get(a) || 0) - (playerGamesCount.get(b) || 0));
-
-      // If we don't have enough players for a match
-      if (availablePlayers.length < 4) {
-        // Only accept incomplete round if this isn't the first court
-        // or if we've already created some matches in this round
-        if (court > 1 || roundMatches.length > 0) {
-          break;
+    // Keep trying to fill all courts until we succeed or exhaust retries
+    while (roundMatches.length < numCourts && retryCount < maxRetries) {
+      for (let court = 1; court <= numCourts; court++) {
+        // Skip if we already have a match for this court
+        if (roundMatches.some(m => m.court === court)) {
+          continue;
         }
-        // If we can't even fill court 1, we're done
-        return matches;
+
+        // Get available players for this match
+        const availablePlayers = playerIds
+          .filter(id => 
+            !playersUsedInRound.has(id) && 
+            (playerGamesCount.get(id) || 0) < maxGamesPerPlayer
+          )
+          .sort((a, b) => (playerGamesCount.get(a) || 0) - (playerGamesCount.get(b) || 0));
+
+        if (availablePlayers.length < 4) {
+          break; // Not enough players for another match
+        }
+
+        const match = createValidMatch(
+          availablePlayers,
+          usedPairings,
+          getPairingKey
+        );
+
+        if (match) {
+          // Mark players as used for this round
+          match.forEach(id => playersUsedInRound.add(id));
+
+          // Add to round matches
+          roundMatches.push({
+            players: match,
+            round,
+            court
+          });
+        }
       }
 
-      const match = createValidMatch(
-        availablePlayers,
-        usedPairings,
-        getPairingKey
-      );
-
-      if (!match) {
-        // Only accept failure if this isn't the first court
-        // or if we've already created some matches in this round
-        if (court > 1 || roundMatches.length > 0) {
-          break;
-        }
-        // If we can't create a match for court 1, we're done
-        return matches;
+      // If we couldn't fill all courts, increment retry counter
+      if (roundMatches.length < numCourts) {
+        retryCount++;
       }
-
-      // Mark players as used for this round
-      match.forEach(id => playersUsedInRound.add(id));
-
-      // Add to round matches
-      roundMatches.push({
-        players: match,
-        round,
-        court
-      });
     }
 
     // If we couldn't create any matches for this round, we're done
