@@ -25,16 +25,13 @@ export default function PointSelector({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <div>
-          <Input
-            type="number"
-            placeholder="Score"
-            className="w-20"
-            value={value}
-            readOnly
-            disabled={disabled}
-          />
-        </div>
+        <Button 
+          variant="outline" 
+          className="w-20"
+          disabled={disabled}
+        >
+          {value || 'Score'}
+        </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-2">
         <div className="grid grid-cols-4 gap-2">
