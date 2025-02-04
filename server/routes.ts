@@ -357,7 +357,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
   const usedPairings = new Set<string>();
   let round = 1;
   const maxGamesPerPlayer = 8;
-  const maxAttempts = 100; // Prevent infinite loops
+  const maxAttempts = 100;
   let attempts = 0;
 
   // Initialize game counts
@@ -381,81 +381,73 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
     // Track players used in this round
     const playersUsedInRound = new Set<number>();
-    let matchesCreatedThisRound = 0;
+    let matchesThisRound = [];
 
-    // For each court in this round
+    // Try to fill all courts in this round
     for (let court = 1; court <= numCourts; court++) {
-      // Get available players for this match (not used in this round and haven't maxed out games)
-      const availableForThisGame = playerIds
+      // Get players who haven't played in this round and haven't maxed out their games
+      const availablePlayers = playerIds
         .filter(id => 
           !playersUsedInRound.has(id) && 
           (playerGamesCount.get(id) || 0) < maxGamesPerPlayer
         )
         .sort((a, b) => (playerGamesCount.get(a) || 0) - (playerGamesCount.get(b) || 0));
 
-      if (availableForThisGame.length < 4) {
-        // If we've created at least one match this round, that's fine - move to next round
-        if (matchesCreatedThisRound > 0) {
-          break;
-        }
-        // If we couldn't create any matches and this is court 1, we're done
-        if (court === 1) {
-          console.log("Not enough players available for next match");
-          break;
-        }
-        continue;
+      if (availablePlayers.length < 4) {
+        break; // Not enough players for another match
       }
 
-      // Try to create a valid match
       const match = createValidMatch(
-        availableForThisGame,
+        availablePlayers,
         usedPairings,
         getPairingKey
       );
 
-      if (match) {
-        // Update tracking
-        match.forEach(playerId => {
-          playersUsedInRound.add(playerId);
-          playerGamesCount.set(playerId, (playerGamesCount.get(playerId) || 0) + 1);
-        });
-
-        // Record partnerships
-        usedPairings.add(getPairingKey(match[0], match[1]));
-        usedPairings.add(getPairingKey(match[2], match[3]));
-
-        matches.push({
-          players: match,
-          round,
-          court,
-        });
-
-        matchesCreatedThisRound++;
-      } else {
-        // If we couldn't create a match but already have some matches this round,
-        // move to the next round
-        if (matchesCreatedThisRound > 0) {
-          break;
-        }
+      if (!match) {
+        break; // No valid match possible with remaining players
       }
+
+      // Add match to this round's collection
+      matchesThisRound.push({
+        players: match,
+        round,
+        court
+      });
+
+      // Mark players as used for this round
+      match.forEach(id => playersUsedInRound.add(id));
     }
 
-    // Only increment round if we created at least one match
-    if (matchesCreatedThisRound > 0) {
-      console.log(`Round ${round}: Created ${matchesCreatedThisRound} matches`);
-      round++;
-    } else {
-      // If we couldn't create any matches this round, we're done
+    // If we couldn't create any matches for this round, we're done
+    if (matchesThisRound.length === 0) {
       console.log("Could not create any matches in round", round);
       break;
     }
+
+    // Add all matches for this round
+    matchesThisRound.forEach(match => {
+      // Record partnerships
+      usedPairings.add(getPairingKey(match.players[0], match.players[1]));
+      usedPairings.add(getPairingKey(match.players[2], match.players[3]));
+
+      // Update game counts
+      match.players.forEach(id => {
+        playerGamesCount.set(id, (playerGamesCount.get(id) || 0) + 1);
+      });
+
+      // Add match to final schedule
+      matches.push(match);
+    });
+
+    console.log(`Round ${round}: Created ${matchesThisRound.length} matches`);
+    round++;
   }
 
   if (matches.length === 0) {
     throw new Error("Could not generate any valid matches");
   }
 
-  // Sort matches to ensure courts are filled in order within each round
+  // Sort matches first by round, then by court number
   return matches.sort((a, b) => {
     if (a.round !== b.round) return a.round - b.round;
     return a.court - b.court;
@@ -468,7 +460,6 @@ function createValidMatch(
   usedPairings: Set<string>,
   getPairingKey: (p1: number, p2: number) => string
 ): number[] | null {
-  // Try all possible combinations of 4 players
   for (let i = 0; i < availablePlayers.length - 3; i++) {
     for (let j = i + 1; j < availablePlayers.length - 2; j++) {
       // Check if first pair has played together
@@ -498,7 +489,6 @@ function createValidMatch(
   return null;
 }
 
-// Helper function to generate all possible team combinations for 4 players
 function generatePossibleTeamCombinations(players: number[]): number[][] {
   if (players.length < 4) return [];
 
