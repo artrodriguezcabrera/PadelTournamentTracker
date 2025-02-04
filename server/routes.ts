@@ -398,18 +398,26 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
         break;
       }
 
-      const match = createValidMatch(
-        remainingPlayers,
-        usedPairings,
-        getPairingKey
-      );
+      // Try a few times to create a valid match for this court
+      let match = null;
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      while (!match && attempts < maxAttempts) {
+        match = createValidMatch(
+          remainingPlayers,
+          usedPairings,
+          getPairingKey
+        );
+        attempts++;
+      }
 
       if (!match) {
-        // If we couldn't create a match for the first court, we're done with this round
+        // Only break if we couldn't create ANY matches this round
         if (currentCourt === 1 && roundMatches.length === 0) {
           break;
         }
-        // If we have at least one match but can't create more, that's okay
+        // Move to next round if we can't fill this court
         break;
       }
 
