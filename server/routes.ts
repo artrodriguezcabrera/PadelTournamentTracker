@@ -1,9 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { tournaments, players, games, tournamentPlayers } from "@db/schema";
+import { tournaments, players, games, tournamentPlayers, users } from "@db/schema";
 import { eq } from "drizzle-orm";
-import { setupAuth } from "./auth";
+import { setupAuth, comparePasswords, hashPassword } from "./auth";
 
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
@@ -368,6 +368,29 @@ export function registerRoutes(app: Express): Server {
       .returning();
 
     res.json(updatedGame[0]);
+  });
+
+  app.post("/api/user/password", requireAuth, async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+
+    // Verify current password
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, req.user!.id)
+    });
+
+    if (!user || !(await comparePasswords(currentPassword, user.password))) {
+      return res.status(400).json({ message: "Current password is incorrect" });
+    }
+
+    // Update password
+    await db
+      .update(users)
+      .set({
+        password: await hashPassword(newPassword)
+      })
+      .where(eq(users.id, req.user!.id));
+
+    res.json({ message: "Password updated successfully" });
   });
 
   return httpServer;

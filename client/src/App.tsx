@@ -9,6 +9,7 @@ import Home from "@/pages/home";
 import Tournament from "@/pages/tournament";
 import Players from "@/pages/players";
 import Auth from "@/pages/auth";
+import Profile from "@/pages/profile";
 
 function Router() {
   return (
@@ -17,6 +18,7 @@ function Router() {
       <ProtectedRoute path="/" component={Home} />
       <ProtectedRoute path="/tournament/:id" component={Tournament} />
       <ProtectedRoute path="/players" component={Players} />
+      <ProtectedRoute path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>
   );

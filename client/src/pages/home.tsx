@@ -26,6 +26,7 @@ import { Trophy, Users, MoreVertical, Edit, Trash } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { type Tournament } from "@db/schema";
+import UserNav from "@/components/user-nav";
 
 type TournamentWithPlayers = Tournament & {
   tournamentPlayers: Array<{
@@ -85,7 +86,10 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8">
         <div className="flex flex-col gap-4 mb-8">
-          <h1 className="text-4xl font-bold">Padel Tournaments</h1>
+          <div className="flex justify-between items-center">
+            <h1 className="text-4xl font-bold">Padel Tournaments</h1>
+            <UserNav />
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" asChild>
               <a href="/players">

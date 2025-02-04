@@ -19,21 +19,17 @@ declare global {
 const scryptAsync = promisify(scrypt);
 const PostgresSessionStore = connectPg(session);
 
-async function hashPassword(password: string) {
+export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
 }
 
-async function comparePasswords(supplied: string, stored: string) {
+export async function comparePasswords(supplied: string, stored: string) {
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
   return timingSafeEqual(hashedBuf, suppliedBuf);
-}
-
-async function getUserByEmail(email: string) {
-  return db.select().from(users).where(eq(users.email, email)).limit(1);
 }
 
 export function setupAuth(app: Express) {
@@ -116,4 +112,8 @@ export function setupAuth(app: Express) {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     res.json(req.user);
   });
+}
+
+async function getUserByEmail(email: string) {
+  return db.select().from(users).where(eq(users.email, email)).limit(1);
 }
