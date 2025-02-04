@@ -390,7 +390,17 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
     // Try to fill ALL courts in this round
     let currentCourt = 1;
-    while (currentCourt <= numCourts) {
+    let skippedCourts = new Set<number>();
+    let failedAttempts = 0;
+    const maxFailedAttempts = 3;
+
+    while (currentCourt <= numCourts || skippedCourts.size > 0) {
+      // If we've tried all courts, go back to skipped ones
+      if (currentCourt > numCourts && skippedCourts.size > 0) {
+        currentCourt = Array.from(skippedCourts)[0];
+        skippedCourts.delete(currentCourt);
+      }
+
       const remainingPlayers = availablePlayers.filter(id => !playersUsedInRound.has(id));
 
       // If we don't have enough players for even one more match, break
@@ -413,12 +423,22 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       }
 
       if (!match) {
-        // Only break if we couldn't create ANY matches this round
-        if (currentCourt === 1 && roundMatches.length === 0) {
-          break;
+        failedAttempts++;
+        if (failedAttempts >= maxFailedAttempts) {
+          // If this is the first court and we have no matches, end the round
+          if (currentCourt === 1 && roundMatches.length === 0) {
+            break;
+          }
+          // If we've tried everything, including skipped courts, end the round
+          if (skippedCourts.size === 0 && currentCourt === numCourts) {
+            break;
+          }
         }
-        // Move to next round if we can't fill this court
-        break;
+        // Add current court to skipped and try next one
+        skippedCourts.add(currentCourt);
+        currentCourt++;
+        failedAttempts = 0;
+        continue;
       }
 
       // Record the match for this court
