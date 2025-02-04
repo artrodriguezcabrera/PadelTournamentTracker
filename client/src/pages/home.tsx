@@ -158,14 +158,6 @@ export default function Home() {
                     </Button>
                   ) : (
                     <>
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => startTournament.mutate(tournament.id)}
-                        disabled={startTournament.isPending}
-                      >
-                        {startTournament.isPending ? "Starting..." : "Start Tournament"}
-                      </Button>
                       <Dialog
                         open={editingPlayers === tournament.id}
                         onOpenChange={(open) =>
@@ -192,6 +184,14 @@ export default function Home() {
                           />
                         </DialogContent>
                       </Dialog>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => startTournament.mutate(tournament.id)}
+                        disabled={startTournament.isPending}
+                      >
+                        {startTournament.isPending ? "Starting..." : "Start Tournament"}
+                      </Button>
                     </>
                   )}
                 </div>
