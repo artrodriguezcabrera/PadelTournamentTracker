@@ -121,30 +121,30 @@ export default function Home() {
                     <Trophy className="h-5 w-5" />
                     {tournament.name}
                   </CardTitle>
-                  {!tournament.isActive && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {!tournament.isActive && (
                         <DropdownMenuItem
                           onClick={() => setEditingTournament(tournament.id)}
                         >
                           <Edit className="h-4 w-4 mr-2" />
                           Edit Tournament
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => setDeletingTournament(tournament.id)}
-                        >
-                          <Trash className="h-4 w-4 mr-2" />
-                          Delete Tournament
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                      )}
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => setDeletingTournament(tournament.id)}
+                      >
+                        <Trash className="h-4 w-4 mr-2" />
+                        Delete Tournament
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </CardHeader>
               <CardContent>
