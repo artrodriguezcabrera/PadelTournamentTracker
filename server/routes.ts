@@ -383,29 +383,26 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     const playersUsedInRound = new Set<number>();
     let matchesCreatedThisRound = 0;
 
-    // Get available players for this round
-    const availablePlayers = playerIds
-      .filter(id => !playersUsedInRound.has(id) && (playerGamesCount.get(id) || 0) < maxGamesPerPlayer)
-      .sort((a, b) => (playerGamesCount.get(a) || 0) - (playerGamesCount.get(b) || 0));
-
-    if (availablePlayers.length < 4) {
-      console.log("Not enough available players for next round");
-      break;
-    }
-
-    // Try to create matches for each court
+    // For each court in this round
     for (let court = 1; court <= numCourts; court++) {
-      // Get players not yet used in this round
-      const availableForThisGame = availablePlayers.filter(id => !playersUsedInRound.has(id));
+      // Get available players for this match (not used in this round and haven't maxed out games)
+      const availableForThisGame = playerIds
+        .filter(id => 
+          !playersUsedInRound.has(id) && 
+          (playerGamesCount.get(id) || 0) < maxGamesPerPlayer
+        )
+        .sort((a, b) => (playerGamesCount.get(a) || 0) - (playerGamesCount.get(b) || 0));
 
       if (availableForThisGame.length < 4) {
-        // If we created at least one match this round and can't fill more courts,
-        // that's okay - we'll move to the next round
+        // If we've created at least one match this round, that's fine - move to next round
         if (matchesCreatedThisRound > 0) {
           break;
         }
-        // If we couldn't create any matches this round, try with all available players
-        // This helps utilize courts in later rounds when fewer players are available
+        // If we couldn't create any matches and this is court 1, we're done
+        if (court === 1) {
+          console.log("Not enough players available for next match");
+          break;
+        }
         continue;
       }
 
@@ -434,16 +431,21 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
         });
 
         matchesCreatedThisRound++;
+      } else {
+        // If we couldn't create a match but already have some matches this round,
+        // move to the next round
+        if (matchesCreatedThisRound > 0) {
+          break;
+        }
       }
     }
 
     // Only increment round if we created at least one match
     if (matchesCreatedThisRound > 0) {
-      // Log court utilization for debugging
       console.log(`Round ${round}: Created ${matchesCreatedThisRound} matches`);
       round++;
     } else {
-      // If we couldn't create any matches this round, break to prevent infinite loop
+      // If we couldn't create any matches this round, we're done
       console.log("Could not create any matches in round", round);
       break;
     }
@@ -453,7 +455,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     throw new Error("Could not generate any valid matches");
   }
 
-  // Sort matches to ensure maximum court utilization in early rounds
+  // Sort matches to ensure courts are filled in order within each round
   return matches.sort((a, b) => {
     if (a.round !== b.round) return a.round - b.round;
     return a.court - b.court;
