@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
@@ -8,6 +8,8 @@ import { queryClient } from "@/lib/queryClient";
 import { type Game } from "@db/schema";
 import PointSelector from "./point-selector";
 import { Layers } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 type GameWithPlayers = Game & {
   player1: { name: string };
@@ -24,6 +26,7 @@ type GameScheduleProps = {
 
 export default function GameSchedule({ tournamentId, games, pointSystem }: GameScheduleProps) {
   const [scores, setScores] = useState<Record<number, { team1: string; team2: string }>>({});
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
   const updateScore = useMutation({
     mutationFn: async ({
@@ -35,11 +38,10 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
       team1Score: number;
       team2Score: number;
     }) => {
-      const response = await apiRequest("POST", `/api/games/${gameId}/score`, {
+      await apiRequest("POST", `/api/games/${gameId}/score`, {
         team1Score,
         team2Score,
       });
-      return response.json();
     },
     onMutate: async ({ gameId, team1Score, team2Score }) => {
       await queryClient.cancelQueries({ queryKey: [`/api/tournaments/${tournamentId}`] });
@@ -91,6 +93,7 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
         [oppositeTeam]: remainingPoints.toString(),
       },
     });
+    setLastUpdated(gameId);
 
     updateScore.mutate({
       gameId,
@@ -110,7 +113,13 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
   return (
     <div className="space-y-8">
       {Array.from(gamesByRound.entries()).map(([roundNumber, courts]) => (
-        <div key={roundNumber} className="space-y-4">
+        <motion.div 
+          key={roundNumber} 
+          className="space-y-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Layers className="h-6 w-6" />
             Round {roundNumber}
@@ -121,43 +130,69 @@ export default function GameSchedule({ tournamentId, games, pointSystem }: GameS
                 <h3 className="text-lg font-semibold text-muted-foreground">
                   Court {courtNumber}
                 </h3>
-                {courtGames.map((game) => (
-                  <Card key={game.id}>
-                    <CardContent className="pt-6">
-                      <div className="flex flex-col space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="font-medium">
-                            {game.player1.name} & {game.player2.name}
-                          </div>
-                          <PointSelector
-                            maxPoints={pointSystem}
-                            value={(game.isComplete ? game.team1Score : scores[game.id]?.team1) || ""}
-                            onChange={(points) => handleScoreChange(game.id, 'team1', points)}
-                            disabled={updateScore.isPending}
-                          />
-                        </div>
+                <AnimatePresence>
+                  {courtGames.map((game) => (
+                    <motion.div
+                      key={game.id}
+                      layout
+                      animate={lastUpdated === game.id ? {
+                        scale: [1, 1.02, 1],
+                        transition: { duration: 0.3 }
+                      } : {}}
+                    >
+                      <Card className={cn(
+                        "transition-shadow duration-200",
+                        lastUpdated === game.id && "shadow-lg"
+                      )}>
+                        <CardContent className="pt-6">
+                          <div className="flex flex-col space-y-4">
+                            <motion.div 
+                              className="flex items-center justify-between"
+                              animate={lastUpdated === game.id ? { 
+                                backgroundColor: ["transparent", "rgba(var(--primary) / 0.1)", "transparent"],
+                                transition: { duration: 0.3 }
+                              } : {}}
+                            >
+                              <div className="font-medium">
+                                {game.player1.name} & {game.player2.name}
+                              </div>
+                              <PointSelector
+                                maxPoints={pointSystem}
+                                value={(game.isComplete ? game.team1Score : scores[game.id]?.team1) || ""}
+                                onChange={(points) => handleScoreChange(game.id, 'team1', points)}
+                                disabled={updateScore.isPending}
+                              />
+                            </motion.div>
 
-                        <Separator className="my-2" />
+                            <Separator className="my-2" />
 
-                        <div className="flex items-center justify-between">
-                          <div className="font-medium">
-                            {game.player3.name} & {game.player4.name}
+                            <motion.div 
+                              className="flex items-center justify-between"
+                              animate={lastUpdated === game.id ? { 
+                                backgroundColor: ["transparent", "rgba(var(--primary) / 0.1)", "transparent"],
+                                transition: { duration: 0.3 }
+                              } : {}}
+                            >
+                              <div className="font-medium">
+                                {game.player3.name} & {game.player4.name}
+                              </div>
+                              <PointSelector
+                                maxPoints={pointSystem}
+                                value={(game.isComplete ? game.team2Score : scores[game.id]?.team2) || ""}
+                                onChange={(points) => handleScoreChange(game.id, 'team2', points)}
+                                disabled={updateScore.isPending}
+                              />
+                            </motion.div>
                           </div>
-                          <PointSelector
-                            maxPoints={pointSystem}
-                            value={(game.isComplete ? game.team2Score : scores[game.id]?.team2) || ""}
-                            onChange={(points) => handleScoreChange(game.id, 'team2', points)}
-                            disabled={updateScore.isPending}
-                          />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
       ))}
     </div>
   );
