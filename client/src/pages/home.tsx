@@ -84,9 +84,9 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col gap-4 mb-8">
           <h1 className="text-4xl font-bold">Padel Tournaments</h1>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" asChild>
               <a href="/players">
                 <Users className="h-4 w-4 mr-2" />
