@@ -30,6 +30,7 @@ type TournamentResponse = {
 export default function Tournament() {
   const { id } = useParams();
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState("games");
 
   const { data: tournament, isLoading } = useQuery<TournamentResponse>({
     queryKey: [`/api/tournaments/${id}`],
@@ -66,27 +67,29 @@ export default function Tournament() {
           <h1 className="text-4xl font-bold">{tournament.name}</h1>
         </div>
 
-        <Tabs defaultValue="games">
+        <Tabs defaultValue="games" onValueChange={setActiveTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="games">Games</TabsTrigger>
             <TabsTrigger value="standings">Standings</TabsTrigger>
           </TabsList>
 
-          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-            {rounds.map((round) => (
-              <Button
-                key={round}
-                variant={currentRound === round ? "default" : "outline"}
-                className={cn(
-                  "min-w-[3rem]",
-                  currentRound === round && "font-bold"
-                )}
-                onClick={() => setSelectedRound(round)}
-              >
-                {round}
-              </Button>
-            ))}
-          </div>
+          {activeTab === "games" && (
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+              {rounds.map((round) => (
+                <Button
+                  key={round}
+                  variant={currentRound === round ? "default" : "outline"}
+                  className={cn(
+                    "min-w-[3rem]",
+                    currentRound === round && "font-bold"
+                  )}
+                  onClick={() => setSelectedRound(round)}
+                >
+                  {round}
+                </Button>
+              ))}
+            </div>
+          )}
 
           <TabsContent value="games">
             <GameSchedule
