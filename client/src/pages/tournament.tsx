@@ -7,6 +7,8 @@ import GameSchedule from "@/components/game-schedule";
 import StandingsTable from "@/components/standings-table";
 import { ArrowLeft } from "lucide-react";
 import { type Game, type Player } from "@db/schema";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 type TournamentResponse = {
   id: number;
@@ -27,6 +29,7 @@ type TournamentResponse = {
 
 export default function Tournament() {
   const { id } = useParams();
+  const [selectedRound, setSelectedRound] = useState<number | null>(null);
 
   const { data: tournament, isLoading } = useQuery<TournamentResponse>({
     queryKey: [`/api/tournaments/${id}`],
@@ -45,6 +48,12 @@ export default function Tournament() {
   const completedGames = tournament.games.filter(game => game.isComplete);
   const players = tournament.tournamentPlayers;
 
+  // Get unique rounds in original order
+  const rounds = [...new Set(tournament.games.map(game => game.roundNumber))];
+
+  // If no round is selected, default to the first round
+  const currentRound = selectedRound ?? rounds[0];
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8">
@@ -62,11 +71,29 @@ export default function Tournament() {
             <TabsTrigger value="games">Games</TabsTrigger>
             <TabsTrigger value="standings">Standings</TabsTrigger>
           </TabsList>
+
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+            {rounds.map((round) => (
+              <Button
+                key={round}
+                variant={currentRound === round ? "default" : "outline"}
+                className={cn(
+                  "min-w-[3rem]",
+                  currentRound === round && "font-bold"
+                )}
+                onClick={() => setSelectedRound(round)}
+              >
+                {round}
+              </Button>
+            ))}
+          </div>
+
           <TabsContent value="games">
             <GameSchedule
               tournamentId={tournament.id}
-              games={tournament.games}
+              games={tournament.games.filter(game => game.roundNumber === currentRound)}
               pointSystem={tournament.pointSystem}
+              roundNumber={currentRound}
             />
           </TabsContent>
           <TabsContent value="standings">
