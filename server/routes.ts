@@ -381,7 +381,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
     // Track players used in this round
     const playersUsedInRound = new Set<number>();
-    let matchesCreatedThisRound = false;
+    let matchesCreatedThisRound = 0;
 
     // Get available players for this round
     const availablePlayers = playerIds
@@ -399,7 +399,14 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       const availableForThisGame = availablePlayers.filter(id => !playersUsedInRound.has(id));
 
       if (availableForThisGame.length < 4) {
-        continue; // Not enough players for this court
+        // If we created at least one match this round and can't fill more courts,
+        // that's okay - we'll move to the next round
+        if (matchesCreatedThisRound > 0) {
+          break;
+        }
+        // If we couldn't create any matches this round, try with all available players
+        // This helps utilize courts in later rounds when fewer players are available
+        continue;
       }
 
       // Try to create a valid match
@@ -426,12 +433,14 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
           court,
         });
 
-        matchesCreatedThisRound = true;
+        matchesCreatedThisRound++;
       }
     }
 
     // Only increment round if we created at least one match
-    if (matchesCreatedThisRound) {
+    if (matchesCreatedThisRound > 0) {
+      // Log court utilization for debugging
+      console.log(`Round ${round}: Created ${matchesCreatedThisRound} matches`);
       round++;
     } else {
       // If we couldn't create any matches this round, break to prevent infinite loop
@@ -444,7 +453,11 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     throw new Error("Could not generate any valid matches");
   }
 
-  return matches;
+  // Sort matches to ensure maximum court utilization in early rounds
+  return matches.sort((a, b) => {
+    if (a.round !== b.round) return a.round - b.round;
+    return a.court - b.court;
+  });
 }
 
 // Helper function to create a valid match
