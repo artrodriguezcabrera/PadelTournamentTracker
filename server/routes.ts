@@ -210,7 +210,7 @@ export function registerRoutes(app: Express): Server {
         .filter((id): id is number => id !== null);
 
       if (playerIds.length < 4) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "Not enough players to start tournament. Minimum 4 players required.",
           currentPlayers: playerIds.length
         });
@@ -223,7 +223,7 @@ export function registerRoutes(app: Express): Server {
         const gameMatches = generateGameMatchesWithCourts(playerIds, tournamentData.courts);
 
         if (!gameMatches || gameMatches.length === 0) {
-          return res.status(400).json({ 
+          return res.status(400).json({
             message: "Could not generate valid game matches. Please ensure you have enough players and try again.",
             error: "No valid matches could be generated",
             playerCount: playerIds.length,
@@ -453,14 +453,10 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       currentCourt++;
     }
 
-    // Validate this round
+    // If we couldn't create any matches for this round, we're done
     if (roundMatches.length === 0) {
-      attempts++;
-      console.log(`Failed to create matches for round ${round}, attempt ${attempts}`);
-      if (attempts >= maxAttempts) {
-        throw new Error(`Could not generate valid schedule after ${maxAttempts} attempts`);
-      }
-      continue;
+      console.log("Could not create any matches in round", round);
+      break;
     }
 
     // Process all matches for this round
@@ -482,7 +478,6 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
     round++;
   }
 
-  // Validate final schedule
   if (matches.length === 0) {
     throw new Error("Could not generate any valid matches");
   }
