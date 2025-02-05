@@ -70,6 +70,7 @@ export function setupAuth(app: Express) {
       .select({
         id: users.id,
         email: users.email,
+        isAdmin: users.isAdmin,
         createdAt: users.createdAt,
       })
       .from(users)
@@ -100,6 +101,7 @@ export function setupAuth(app: Express) {
       .returning({
         id: users.id,
         email: users.email,
+        isAdmin: users.isAdmin,
         createdAt: users.createdAt,
       });
 
