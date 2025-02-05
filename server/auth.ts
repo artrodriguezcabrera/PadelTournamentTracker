@@ -9,6 +9,7 @@ import { users, type User } from "@db/schema";
 import { db, pool } from "@db";
 import { eq } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
+import { z } from "zod";
 
 declare global {
   namespace Express {
@@ -18,6 +19,12 @@ declare global {
 
 const scryptAsync = promisify(scrypt);
 const PostgresSessionStore = connectPg(session);
+
+// Define the schema for user registration
+const insertUserSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
 
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -81,34 +88,40 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/register", async (req, res, next) => {
-    const result = insertUserSchema.safeParse(req.body);
-    if (!result.success) {
-      const error = fromZodError(result.error);
-      return res.status(400).send(error.toString());
-    }
+    try {
+      const result = insertUserSchema.safeParse(req.body);
+      if (!result.success) {
+        const error = fromZodError(result.error);
+        return res.status(400).json({ message: error.message });
+      }
 
-    const [existingUser] = await getUserByEmail(result.data.email);
-    if (existingUser) {
-      return res.status(400).send("Email already exists");
-    }
+      const [existingUser] = await getUserByEmail(result.data.email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
 
-    const [user] = await db
-      .insert(users)
-      .values({
-        ...result.data,
-        password: await hashPassword(result.data.password),
-      })
-      .returning({
-        id: users.id,
-        email: users.email,
-        isAdmin: users.isAdmin,
-        createdAt: users.createdAt,
+      const [user] = await db
+        .insert(users)
+        .values({
+          email: result.data.email,
+          password: await hashPassword(result.data.password),
+          isAdmin: false,
+        })
+        .returning({
+          id: users.id,
+          email: users.email,
+          isAdmin: users.isAdmin,
+          createdAt: users.createdAt,
+        });
+
+      req.login(user, (err) => {
+        if (err) return next(err);
+        res.status(201).json(user);
       });
-
-    req.login(user, (err) => {
-      if (err) return next(err);
-      res.status(201).json(user);
-    });
+    } catch (error) {
+      console.error("Registration error:", error);
+      next(error);
+    }
   });
 
   app.post("/api/login", passport.authenticate("local"), (req, res) => {
