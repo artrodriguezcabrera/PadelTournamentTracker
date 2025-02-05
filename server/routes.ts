@@ -1,9 +1,15 @@
 import { Express, Request, Response, NextFunction } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { tournaments, players, games, tournamentPlayers, users } from "@db/schema";
 import { eq, desc, sql } from "drizzle-orm"; // Added import for desc and sql
 import { setupAuth, comparePasswords, hashPassword } from "./auth";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
@@ -513,6 +519,63 @@ export function registerRoutes(app: Express): Server {
 
     res.json(user);
   });
+
+  // Add the following routes inside registerRoutes function, before return httpServer:
+
+  app.post("/api/user/profile", requireAuth, async (req, res) => {
+    const { name } = req.body;
+
+    const [updatedUser] = await db
+      .update(users)
+      .set({ name })
+      .where(eq(users.id, req.user!.id))
+      .returning({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        profilePhoto: users.profilePhoto,
+        isAdmin: users.isAdmin,
+        createdAt: users.createdAt,
+      });
+
+    res.json(updatedUser);
+  });
+
+  app.post("/api/user/photo", requireAuth, upload.single("photo"), async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    // Generate a unique filename
+    const timestamp = Date.now();
+    const filename = `${req.user!.id}-${timestamp}-${req.file.originalname}`;
+    const filepath = path.join(process.cwd(), "uploads", filename);
+
+    // Ensure uploads directory exists
+    await fs.promises.mkdir(path.join(process.cwd(), "uploads"), { recursive: true });
+
+    // Write the file
+    await fs.promises.writeFile(filepath, req.file.buffer);
+
+    // Update user profile photo in database
+    const [updatedUser] = await db
+      .update(users)
+      .set({ profilePhoto: `/uploads/${filename}` })
+      .where(eq(users.id, req.user!.id))
+      .returning({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        profilePhoto: users.profilePhoto,
+        isAdmin: users.isAdmin,
+        createdAt: users.createdAt,
+      });
+
+    res.json(updatedUser);
+  });
+
+  // Serve uploaded files
+  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
   return httpServer;
 }
