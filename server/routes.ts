@@ -2,7 +2,7 @@ import { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { tournaments, players, games, tournamentPlayers, users } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm"; // Added import for desc and sql
 import { setupAuth, comparePasswords, hashPassword } from "./auth";
 
 export function registerRoutes(app: Express): Server {
@@ -31,9 +31,9 @@ export function registerRoutes(app: Express): Server {
     const { name } = req.body;
     const newPlayer = await db
       .insert(players)
-      .values({ 
+      .values({
         name,
-        userId: req.user!.id
+        userId: req.user!.id,
       })
       .returning();
     res.json(newPlayer[0]);
@@ -91,7 +91,7 @@ export function registerRoutes(app: Express): Server {
 
     if (playerTournaments.length > 0) {
       res.status(400).json({
-        message: "Cannot delete player that is part of a tournament"
+        message: "Cannot delete player that is part of a tournament",
       });
       return;
     }
@@ -159,11 +159,11 @@ export function registerRoutes(app: Express): Server {
     const newTournament = await db.transaction(async (tx) => {
       const [tournament] = await tx
         .insert(tournaments)
-        .values({ 
-          name, 
-          pointSystem, 
+        .values({
+          name,
+          pointSystem,
           courts,
-          userId: req.user!.id
+          userId: req.user!.id,
         })
         .returning();
 
@@ -277,7 +277,7 @@ export function registerRoutes(app: Express): Server {
       if (playerIds.length < 4) {
         return res.status(400).json({
           message: "Not enough players to start tournament. Minimum 4 players required.",
-          currentPlayers: playerIds.length
+          currentPlayers: playerIds.length,
         });
       }
 
@@ -292,7 +292,7 @@ export function registerRoutes(app: Express): Server {
             message: "Could not generate valid game matches. Please ensure you have enough players and try again.",
             error: "No valid matches could be generated",
             playerCount: playerIds.length,
-            courts: tournamentData.courts
+            courts: tournamentData.courts,
           });
         }
 
@@ -325,21 +325,21 @@ export function registerRoutes(app: Express): Server {
           message: "Tournament started successfully",
           gamesGenerated: gameMatches.length,
           rounds: Math.max(...gameMatches.map(m => m.round)),
-          games: gameMatches
+          games: gameMatches,
         });
       } catch (error) {
         console.error("Error generating game matches:", error);
         return res.status(400).json({
           message: error instanceof Error ? error.message : "Failed to generate game matches",
           playerCount: playerIds.length,
-          courts: tournamentData.courts
+          courts: tournamentData.courts,
         });
       }
     } catch (error) {
       console.error("Error starting tournament:", error);
       return res.status(500).json({
         message: "Failed to start tournament",
-        error: error instanceof Error ? error.message : "Unknown error"
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
   });
@@ -429,7 +429,7 @@ export function registerRoutes(app: Express): Server {
 
     // Verify current password
     const user = await db.query.users.findFirst({
-      where: eq(users.id, req.user!.id)
+      where: eq(users.id, req.user!.id),
     });
 
     if (!user || !(await comparePasswords(currentPassword, user.password))) {
@@ -440,11 +440,78 @@ export function registerRoutes(app: Express): Server {
     await db
       .update(users)
       .set({
-        password: await hashPassword(newPassword)
+        password: await hashPassword(newPassword),
       })
       .where(eq(users.id, req.user!.id));
 
     res.json({ message: "Password updated successfully" });
+  });
+
+
+  // Admin routes
+  app.get("/api/admin/stats", requireAuth, async (req, res) => {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const [totalUsers] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(users);
+
+    const [totalTournaments] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(tournaments);
+
+    const [activeTournaments] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(tournaments)
+      .where(eq(tournaments.isActive, true));
+
+    const usersList = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        createdAt: users.createdAt,
+        isAdmin: users.isAdmin,
+      })
+      .from(users)
+      .orderBy(desc(users.createdAt))
+      .limit(10);
+
+    const recentTournaments = await db
+      .select()
+      .from(tournaments)
+      .orderBy(desc(tournaments.createdAt))
+      .limit(10);
+
+    res.json({
+      totalUsers: totalUsers.count,
+      totalTournaments: totalTournaments.count,
+      activeTournaments: activeTournaments.count,
+      completedTournaments: totalTournaments.count - activeTournaments.count,
+      usersList,
+      recentTournaments,
+    });
+  });
+
+  // Make user admin
+  app.post("/api/admin/make-admin", requireAuth, async (req, res) => {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const { email } = req.body;
+    const [user] = await db
+      .update(users)
+      .set({ isAdmin: true })
+      .where(eq(users.email, email))
+      .returning();
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json(user);
   });
 
   return httpServer;
@@ -502,8 +569,8 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
 
       // Get available players for this match
       const availablePlayers = playerIds
-        .filter(id => 
-          !playersUsedInRound.has(id) && 
+        .filter(id =>
+          !playersUsedInRound.has(id) &&
           (playerGamesCount.get(id) || 0) < targetGamesPerPlayer
         )
         .sort((a, b) => (playerGamesCount.get(a) || 0) - (playerGamesCount.get(b) || 0));
@@ -578,7 +645,7 @@ function generateGameMatchesWithCourts(playerIds: number[], numCourts: number): 
       roundMatches.push({
         players: match,
         round,
-        court: currentCourt
+        court: currentCourt,
       });
 
       // Mark players as used and update counts

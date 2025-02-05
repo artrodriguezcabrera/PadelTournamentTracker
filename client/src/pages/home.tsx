@@ -22,11 +22,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trophy, Users, MoreVertical, Edit, Trash } from "lucide-react";
+import { Trophy, Users, MoreVertical, Edit, Trash, Shield } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { type Tournament } from "@db/schema";
 import UserNav from "@/components/user-nav";
+import { useAuth } from "@/hooks/use-auth";
 
 type TournamentWithPlayers = Tournament & {
   tournamentPlayers: Array<{
@@ -41,6 +42,7 @@ export default function Home() {
   const [editingPlayers, setEditingPlayers] = useState<number | null>(null);
   const [deletingTournament, setDeletingTournament] = useState<number | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const { data: tournaments } = useQuery<TournamentWithPlayers[]>({
     queryKey: ["/api/tournaments"],
@@ -97,6 +99,14 @@ export default function Home() {
                 Players
               </a>
             </Button>
+            {user?.isAdmin && (
+              <Button variant="outline" asChild>
+                <a href="/admin">
+                  <Shield className="h-4 w-4 mr-2" />
+                  Admin Dashboard
+                </a>
+              </Button>
+            )}
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
                 <Button>Create Tournament</Button>
