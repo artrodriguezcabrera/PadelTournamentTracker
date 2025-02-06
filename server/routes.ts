@@ -25,6 +25,9 @@ export function registerRoutes(app: Express): Server {
     next();
   };
 
+  // Serve uploaded files - Moved this line earlier to ensure correct handling
+  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
   // Player routes
   app.get("/api/players", requireAuth, async (req, res) => {
     const allPlayers = await db.query.players.findMany({
@@ -587,9 +590,6 @@ export function registerRoutes(app: Express): Server {
       });
     }
   });
-
-  // Serve uploaded files
-  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
   return httpServer;
 }
