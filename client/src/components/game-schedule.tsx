@@ -21,9 +21,22 @@ type GameScheduleProps = {
   games: GameWithPlayers[];
   pointSystem: number;
   roundNumber: number;
+  isPublic?: boolean;
 };
 
-export default function GameSchedule({ tournamentId, games, pointSystem, roundNumber }: GameScheduleProps) {
+const StaticScore = ({ value }: { value: string | number | null }) => (
+    <div className="px-3 py-1.5 rounded-md border bg-muted min-w-[60px] text-center">
+      {value ?? '-'}
+    </div>
+  );
+
+export default function GameSchedule({ 
+  tournamentId, 
+  games, 
+  pointSystem, 
+  roundNumber,
+  isPublic = false 
+}: GameScheduleProps) {
   const [scores, setScores] = useState<Record<number, { team1: string; team2: string }>>({});
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
@@ -101,7 +114,7 @@ export default function GameSchedule({ tournamentId, games, pointSystem, roundNu
     });
   };
 
-  const courts = [...new Set(games.map(game => game.courtNumber))];
+  const courts = [...new Set(games.map(game => game.courtNumber))].sort((a, b) => a - b);
 
   return (
     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -139,12 +152,16 @@ export default function GameSchedule({ tournamentId, games, pointSystem, roundNu
                           <div className="font-medium min-w-[150px] text-sm sm:text-base">
                             {game.player1.name} & {game.player2.name}
                           </div>
-                          <PointSelector
-                            maxPoints={pointSystem}
-                            value={(game.isComplete ? game.team1Score?.toString() : scores[game.id]?.team1) || ""}
-                            onChange={(points) => handleScoreChange(game.id, 'team1', points)}
-                            disabled={updateScore.isPending}
-                          />
+                          {isPublic ? (
+                            <StaticScore value={game.team1Score} />
+                          ) : (
+                            <PointSelector
+                              maxPoints={pointSystem}
+                              value={(game.isComplete ? game.team1Score?.toString() : scores[game.id]?.team1) || ""}
+                              onChange={(points) => handleScoreChange(game.id, 'team1', points)}
+                              disabled={updateScore.isPending}
+                            />
+                          )}
                         </motion.div>
 
                         <Separator className="my-2" />
@@ -159,12 +176,16 @@ export default function GameSchedule({ tournamentId, games, pointSystem, roundNu
                           <div className="font-medium min-w-[150px] text-sm sm:text-base">
                             {game.player3.name} & {game.player4.name}
                           </div>
-                          <PointSelector
-                            maxPoints={pointSystem}
-                            value={(game.isComplete ? game.team2Score?.toString() : scores[game.id]?.team2) || ""}
-                            onChange={(points) => handleScoreChange(game.id, 'team2', points)}
-                            disabled={updateScore.isPending}
-                          />
+                          {isPublic ? (
+                            <StaticScore value={game.team2Score} />
+                          ) : (
+                            <PointSelector
+                              maxPoints={pointSystem}
+                              value={(game.isComplete ? game.team2Score?.toString() : scores[game.id]?.team2) || ""}
+                              onChange={(points) => handleScoreChange(game.id, 'team2', points)}
+                              disabled={updateScore.isPending}
+                            />
+                          )}
                         </motion.div>
                       </div>
                     </CardContent>
