@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,11 +14,10 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Upload } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 const passwordFormSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
@@ -29,38 +28,14 @@ const passwordFormSchema = z.object({
   path: ["confirmPassword"],
 });
 
-const profileFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-});
-
 type PasswordFormData = z.infer<typeof passwordFormSchema>;
-type ProfileFormData = z.infer<typeof profileFormSchema>;
 
 export default function ProfilePage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [isEditingPassword, setIsEditingPassword] = useState(false);
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
 
-  // Force refetch user data on mount and after any updates
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const response = await fetch("/api/user", {
-          credentials: "include"
-        });
-        const userData = await response.json();
-        queryClient.setQueryData(["/api/user"], userData);
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      }
-    };
-
-    fetchUserData();
-  }, [queryClient]);
-
-  const passwordForm = useForm<PasswordFormData>({
+  const form = useForm<PasswordFormData>({
     resolver: zodResolver(passwordFormSchema),
     defaultValues: {
       currentPassword: "",
@@ -68,20 +43,6 @@ export default function ProfilePage() {
       confirmPassword: "",
     },
   });
-
-  const profileForm = useForm<ProfileFormData>({
-    resolver: zodResolver(profileFormSchema),
-    defaultValues: {
-      name: user?.name || "",
-    },
-  });
-
-  // Update form when user data changes
-  useEffect(() => {
-    if (user?.name) {
-      profileForm.reset({ name: user.name });
-    }
-  }, [user?.name, profileForm]);
 
   const updatePasswordMutation = useMutation({
     mutationFn: async (data: PasswordFormData) => {
@@ -92,8 +53,8 @@ export default function ProfilePage() {
         title: "Password updated",
         description: "Your password has been updated successfully.",
       });
-      passwordForm.reset();
-      setIsEditingPassword(false);
+      form.reset();
+      setIsEditing(false);
     },
     onError: (error: Error) => {
       toast({
@@ -104,83 +65,8 @@ export default function ProfilePage() {
     },
   });
 
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data: ProfileFormData) => {
-      const response = await apiRequest("POST", "/api/user/profile", data);
-      const updatedUser = await response.json();
-      return updatedUser;
-    },
-    onSuccess: async () => {
-      // Fetch fresh user data after update
-      const response = await fetch("/api/user", {
-        credentials: "include"
-      });
-      const freshUserData = await response.json();
-      queryClient.setQueryData(["/api/user"], freshUserData);
-
-      toast({
-        title: "Profile updated",
-        description: "Your profile has been updated successfully.",
-      });
-      setIsEditingProfile(false);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to update profile",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("photo", file);
-
-    try {
-      const response = await fetch("/api/user/photo", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to upload photo");
-      }
-
-      const updatedUser = await response.json();
-
-      // Fetch fresh user data after photo upload
-      const freshResponse = await fetch("/api/user", {
-        credentials: "include"
-      });
-      const freshUserData = await freshResponse.json();
-      queryClient.setQueryData(["/api/user"], freshUserData);
-
-      toast({
-        title: "Photo uploaded",
-        description: "Your profile photo has been updated successfully.",
-      });
-    } catch (error) {
-      console.error("Upload error:", error);
-      toast({
-        title: "Failed to upload photo",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const onPasswordSubmit = (data: PasswordFormData) => {
+  const onSubmit = (data: PasswordFormData) => {
     updatePasswordMutation.mutate(data);
-  };
-
-  const onProfileSubmit = (data: ProfileFormData) => {
-    updateProfileMutation.mutate(data);
   };
 
   return (
@@ -195,111 +81,32 @@ export default function ProfilePage() {
           <h1 className="text-2xl sm:text-4xl font-bold">Profile Settings</h1>
         </div>
 
-        <div className="max-w-2xl mx-auto space-y-6">
+        <div className="max-w-2xl mx-auto">
           <Card>
             <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
+              <CardTitle>Account Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex flex-col items-center gap-4">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage
-                    src={user?.profilePhoto || ""}
-                    alt={user?.name || user?.email} />
-                  <AvatarFallback>
-                    {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    id="photo-upload"
-                    onChange={handleFileUpload}
-                  />
-                  <Button variant="outline" asChild>
-                    <label htmlFor="photo-upload" className="cursor-pointer">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Photo
-                    </label>
-                  </Button>
-                </div>
-              </div>
-
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium">Profile Details</h3>
-                  {!isEditingProfile && (
-                    <Button onClick={() => setIsEditingProfile(true)}>
-                      Edit Profile
-                    </Button>
-                  )}
-                </div>
-
-                {isEditingProfile ? (
-                  <Form {...profileForm}>
-                    <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
-                      <FormField
-                        control={profileForm.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Name</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            profileForm.reset();
-                            setIsEditingProfile(false);
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={updateProfileMutation.isPending}
-                        >
-                          {updateProfileMutation.isPending
-                            ? "Updating..."
-                            : "Update Profile"}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">Name</p>
-                    <p>{user?.name || "Not set"}</p>
-                    <p className="text-sm text-muted-foreground mt-4">Email</p>
-                    <p>{user?.email}</p>
-                  </div>
-                )}
+                <h3 className="text-lg font-medium mb-2">Email</h3>
+                <p className="text-muted-foreground">{user?.email}</p>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium">Password</h3>
-                  {!isEditingPassword && (
-                    <Button onClick={() => setIsEditingPassword(true)}>
+                  {!isEditing && (
+                    <Button onClick={() => setIsEditing(true)}>
                       Change Password
                     </Button>
                   )}
                 </div>
 
-                {isEditingPassword && (
-                  <Form {...passwordForm}>
-                    <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+                {isEditing && (
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                       <FormField
-                        control={passwordForm.control}
+                        control={form.control}
                         name="currentPassword"
                         render={({ field }) => (
                           <FormItem>
@@ -312,7 +119,7 @@ export default function ProfilePage() {
                         )}
                       />
                       <FormField
-                        control={passwordForm.control}
+                        control={form.control}
                         name="newPassword"
                         render={({ field }) => (
                           <FormItem>
@@ -325,7 +132,7 @@ export default function ProfilePage() {
                         )}
                       />
                       <FormField
-                        control={passwordForm.control}
+                        control={form.control}
                         name="confirmPassword"
                         render={({ field }) => (
                           <FormItem>
@@ -342,8 +149,8 @@ export default function ProfilePage() {
                           type="button"
                           variant="outline"
                           onClick={() => {
-                            passwordForm.reset();
-                            setIsEditingPassword(false);
+                            form.reset();
+                            setIsEditing(false);
                           }}
                         >
                           Cancel

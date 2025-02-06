@@ -1,15 +1,9 @@
 import { Express, Request, Response, NextFunction } from "express";
-import express from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { tournaments, players, games, tournamentPlayers, users } from "@db/schema";
 import { eq, desc, sql } from "drizzle-orm"; // Added import for desc and sql
 import { setupAuth, comparePasswords, hashPassword } from "./auth";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
-
-const upload = multer({ storage: multer.memoryStorage() });
 
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
@@ -24,14 +18,6 @@ export function registerRoutes(app: Express): Server {
     }
     next();
   };
-
-  // Serve uploaded files
-  const uploadsPath = path.join(process.cwd(), "uploads");
-  // Ensure uploads directory exists
-  if (!fs.existsSync(uploadsPath)) {
-    fs.mkdirSync(uploadsPath, { recursive: true });
-  }
-  app.use("/uploads", express.static(uploadsPath));
 
   // Player routes
   app.get("/api/players", requireAuth, async (req, res) => {
@@ -526,96 +512,6 @@ export function registerRoutes(app: Express): Server {
     }
 
     res.json(user);
-  });
-
-  // Add the following routes inside registerRoutes function, before return httpServer:
-  app.post("/api/user/profile", requireAuth, async (req, res) => {
-    const { name } = req.body;
-
-    try {
-      const [updatedUser] = await db
-        .update(users)
-        .set({ name })
-        .where(eq(users.id, req.user!.id))
-        .returning({
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          profilePhoto: users.profilePhoto,
-          isAdmin: users.isAdmin,
-          createdAt: users.createdAt,
-        });
-
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      console.log("Profile updated successfully:", {
-        userId: updatedUser.id,
-        name: updatedUser.name,
-      });
-
-      res.json(updatedUser);
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      res.status(500).json({
-        message: "Failed to update profile",
-        error: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-
-  app.post("/api/user/photo", requireAuth, upload.single("photo"), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-      }
-
-      // Ensure uploads directory exists
-      const uploadDir = path.join(process.cwd(), "uploads");
-      await fs.promises.mkdir(uploadDir, { recursive: true });
-
-      // Generate a unique filename
-      const timestamp = Date.now();
-      const filename = `${req.user!.id}-${timestamp}-${req.file.originalname}`;
-      const filepath = path.join(uploadDir, filename);
-
-      // Write the file
-      await fs.promises.writeFile(filepath, req.file.buffer);
-
-      // Update user profile photo in database
-      const [updatedUser] = await db
-        .update(users)
-        .set({ profilePhoto: `/uploads/${filename}` })
-        .where(eq(users.id, req.user!.id))
-        .returning({
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          profilePhoto: users.profilePhoto,
-          isAdmin: users.isAdmin,
-          createdAt: users.createdAt,
-        });
-
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      console.log("File uploaded successfully:", {
-        filename,
-        filepath,
-        userId: req.user!.id,
-        profilePhoto: updatedUser.profilePhoto
-      });
-
-      res.json(updatedUser);
-    } catch (error) {
-      console.error("Error uploading file:", error);
-      res.status(500).json({
-        message: "Failed to upload photo",
-        error: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
   });
 
   return httpServer;
