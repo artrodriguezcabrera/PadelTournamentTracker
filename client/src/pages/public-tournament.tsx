@@ -3,14 +3,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { type Tournament } from "@db/schema";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import GameSchedule from "@/components/game-schedule";
+import StandingsTable from "@/components/standings-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type TournamentWithRelations = Tournament & {
@@ -18,7 +12,18 @@ type TournamentWithRelations = Tournament & {
     playerId: number;
     player: { id: number; name: string };
   }>;
-  games: Array<any>; // Use the proper Game type here
+  games: Array<{
+    id: number;
+    roundNumber: number;
+    courtNumber: number;
+    team1Score: number | null;
+    team2Score: number | null;
+    isComplete: boolean;
+    player1: { id: number; name: string } | null;
+    player2: { id: number; name: string } | null;
+    player3: { id: number; name: string } | null;
+    player4: { id: number; name: string } | null;
+  }>;
 };
 
 export default function PublicTournament({ params }: { params: { publicId: string } }) {
@@ -60,84 +65,27 @@ export default function PublicTournament({ params }: { params: { publicId: strin
           </div>
         </div>
 
-        <Tabs defaultValue="games">
+        <Tabs defaultValue="games" className="space-y-4">
           <TabsList>
             <TabsTrigger value="games">Games</TabsTrigger>
             <TabsTrigger value="standings">Standings</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="games">
-            <div className="grid gap-4">
-              {tournament.games.map((game) => (
-                <Card key={game.id}>
-                  <CardHeader>
-                    <CardTitle className="text-lg">
-                      Round {game.roundNumber} - Court {game.courtNumber}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <h3 className="font-medium mb-2">Team 1</h3>
-                        <p>{game.player1?.name}</p>
-                        <p>{game.player2?.name}</p>
-                        {game.isComplete && (
-                          <p className="text-2xl font-bold mt-2">{game.team1Score}</p>
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="font-medium mb-2">Team 2</h3>
-                        <p>{game.player3?.name}</p>
-                        <p>{game.player4?.name}</p>
-                        {game.isComplete && (
-                          <p className="text-2xl font-bold mt-2">{game.team2Score}</p>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+          <TabsContent value="games" className="space-y-4">
+            <GameSchedule
+              games={tournament.games}
+              isPublic={true}
+            />
           </TabsContent>
 
           <TabsContent value="standings">
             <Card>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Player</TableHead>
-                      <TableHead>Games Played</TableHead>
-                      <TableHead>Points</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tournament.tournamentPlayers.map(({ player }) => {
-                      const playerGames = tournament.games.filter(
-                        (g) =>
-                          g.player1Id === player.id ||
-                          g.player2Id === player.id ||
-                          g.player3Id === player.id ||
-                          g.player4Id === player.id
-                      );
-                      const completedGames = playerGames.filter((g) => g.isComplete);
-                      const points = completedGames.reduce((total, game) => {
-                        const isTeam1 =
-                          game.player1Id === player.id || game.player2Id === player.id;
-                        const score = isTeam1 ? game.team1Score : game.team2Score;
-                        return total + (score || 0);
-                      }, 0);
-
-                      return (
-                        <TableRow key={player.id}>
-                          <TableCell>{player.name}</TableCell>
-                          <TableCell>{completedGames.length}</TableCell>
-                          <TableCell>{points}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+              <CardContent className="pt-6">
+                <StandingsTable
+                  games={tournament.games}
+                  players={tournament.tournamentPlayers.map(tp => tp.player)}
+                  pointSystem={tournament.pointSystem}
+                />
               </CardContent>
             </Card>
           </TabsContent>
