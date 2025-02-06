@@ -95,8 +95,10 @@ export default function ProfilePage() {
       return updatedUser;
     },
     onSuccess: (updatedUser) => {
-      queryClient.setQueryData(["/api/user"], updatedUser);
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.setQueryData(["/api/user"], (oldData: any) => ({
+        ...oldData,
+        ...updatedUser
+      }));
       toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
@@ -132,8 +134,10 @@ export default function ProfilePage() {
       }
 
       const updatedUser = await response.json();
-      queryClient.setQueryData(["/api/user"], updatedUser);
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.setQueryData(["/api/user"], (oldData: any) => ({
+        ...oldData,
+        ...updatedUser
+      }));
 
       toast({
         title: "Photo uploaded",

@@ -25,8 +25,13 @@ export function registerRoutes(app: Express): Server {
     next();
   };
 
-  // Serve uploaded files - Moved this line earlier to ensure correct handling
-  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+  // Serve uploaded files
+  const uploadsPath = path.join(process.cwd(), "uploads");
+  // Ensure uploads directory exists
+  if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath, { recursive: true });
+  }
+  app.use("/uploads", express.static(uploadsPath));
 
   // Player routes
   app.get("/api/players", requireAuth, async (req, res) => {
