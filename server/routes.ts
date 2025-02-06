@@ -2,8 +2,9 @@ import { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { tournaments, players, games, tournamentPlayers, users } from "@db/schema";
-import { eq, desc, sql } from "drizzle-orm"; // Added import for desc and sql
+import { eq, desc, sql } from "drizzle-orm";
 import { setupAuth, comparePasswords, hashPassword } from "./auth";
+import { randomUUID } from "crypto";
 
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
@@ -512,6 +513,91 @@ export function registerRoutes(app: Express): Server {
     }
 
     res.json(user);
+  });
+
+  // Make tournament public
+  app.post("/api/tournaments/:id/public", requireAuth, async (req, res) => {
+    const tournamentId = parseInt(req.params.id);
+
+    const tournament = await db.query.tournaments.findFirst({
+      where: eq(tournaments.id, tournamentId),
+    });
+
+    if (!tournament) {
+      return res.status(404).json({ message: "Tournament not found" });
+    }
+
+    if (tournament.userId !== req.user!.id) {
+      return res.status(403).json({ message: "Not authorized to modify this tournament" });
+    }
+
+    const publicId = randomUUID();
+    const [updatedTournament] = await db
+      .update(tournaments)
+      .set({
+        isPublic: true,
+        publicId
+      })
+      .where(eq(tournaments.id, tournamentId))
+      .returning();
+
+    res.json(updatedTournament);
+  });
+
+  // Remove public access
+  app.post("/api/tournaments/:id/private", requireAuth, async (req, res) => {
+    const tournamentId = parseInt(req.params.id);
+
+    const tournament = await db.query.tournaments.findFirst({
+      where: eq(tournaments.id, tournamentId),
+    });
+
+    if (!tournament) {
+      return res.status(404).json({ message: "Tournament not found" });
+    }
+
+    if (tournament.userId !== req.user!.id) {
+      return res.status(403).json({ message: "Not authorized to modify this tournament" });
+    }
+
+    const [updatedTournament] = await db
+      .update(tournaments)
+      .set({
+        isPublic: false,
+        publicId: null
+      })
+      .where(eq(tournaments.id, tournamentId))
+      .returning();
+
+    res.json(updatedTournament);
+  });
+
+  // Public tournament view
+  app.get("/api/public/tournaments/:publicId", async (req, res) => {
+    const tournament = await db.query.tournaments.findFirst({
+      where: eq(tournaments.publicId, req.params.publicId),
+      with: {
+        tournamentPlayers: {
+          with: {
+            player: true,
+          },
+        },
+        games: {
+          with: {
+            player1: true,
+            player2: true,
+            player3: true,
+            player4: true,
+          },
+        },
+      },
+    });
+
+    if (!tournament || !tournament.isPublic) {
+      return res.status(404).json({ message: "Tournament not found" });
+    }
+
+    res.json(tournament);
   });
 
   return httpServer;

@@ -22,12 +22,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trophy, Users, MoreVertical, Edit, Trash, Shield } from "lucide-react";
+import { Trophy, Users, MoreVertical, Edit, Trash, Shield, Link2, Link2Off } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { type Tournament } from "@db/schema";
 import UserNav from "@/components/user-nav";
 import { useAuth } from "@/hooks/use-auth";
+import { Input } from "@/components/ui/input";
 
 type TournamentWithPlayers = Tournament & {
   tournamentPlayers: Array<{
@@ -80,6 +81,34 @@ export default function Home() {
       toast({
         title: "Tournament deleted",
         description: "The tournament has been deleted successfully.",
+      });
+    },
+  });
+
+  const makePublicMutation = useMutation({
+    mutationFn: async (tournamentId: number) => {
+      const response = await apiRequest("POST", `/api/tournaments/${tournamentId}/public`);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tournaments"] });
+      toast({
+        title: "Tournament made public",
+        description: "Anyone with the link can now view this tournament.",
+      });
+    },
+  });
+
+  const makePrivateMutation = useMutation({
+    mutationFn: async (tournamentId: number) => {
+      const response = await apiRequest("POST", `/api/tournaments/${tournamentId}/private`);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tournaments"] });
+      toast({
+        title: "Public access removed",
+        description: "The tournament is now private.",
       });
     },
   });
@@ -150,6 +179,21 @@ export default function Home() {
                           Edit Tournament
                         </DropdownMenuItem>
                       )}
+                      {!tournament.isPublic ? (
+                        <DropdownMenuItem
+                          onClick={() => makePublicMutation.mutate(tournament.id)}
+                        >
+                          <Link2 className="h-4 w-4 mr-2" />
+                          Make Public
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem
+                          onClick={() => makePrivateMutation.mutate(tournament.id)}
+                        >
+                          <Link2Off className="h-4 w-4 mr-2" />
+                          Remove Public Link
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem
                         className="text-destructive"
                         onClick={() => setDeletingTournament(tournament.id)}
@@ -166,6 +210,28 @@ export default function Home() {
                   Point System: {tournament.pointSystem} points
                   <br />
                   Courts: {tournament.courts}
+                  {tournament.isPublic && tournament.publicId && (
+                    <>
+                      <br />
+                      <span className="flex items-center gap-2 mt-2">
+                        <Link2 className="h-4 w-4" />
+                        Public URL:
+                        <Input
+                          readOnly
+                          value={`${window.location.origin}/tournament/public/${tournament.publicId}`}
+                          className="inline-block w-auto flex-1"
+                          onClick={(e) => {
+                            e.currentTarget.select();
+                            navigator.clipboard.writeText(e.currentTarget.value);
+                            toast({
+                              title: "URL copied",
+                              description: "The public URL has been copied to your clipboard.",
+                            });
+                          }}
+                        />
+                      </span>
+                    </>
+                  )}
                 </p>
                 <div className="flex flex-col gap-2">
                   {tournament.isActive ? (

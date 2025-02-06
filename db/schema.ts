@@ -24,6 +24,8 @@ export const tournaments = pgTable("tournaments", {
   courts: integer("courts").notNull().default(1),
   isActive: boolean("is_active").default(false),
   userId: integer("user_id").references(() => users.id).notNull(),
+  isPublic: boolean("is_public").default(false),
+  publicId: text("public_id").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
