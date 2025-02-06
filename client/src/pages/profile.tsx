@@ -44,9 +44,21 @@ export default function ProfilePage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const queryClient = useQueryClient();
 
+  // Force refetch user data on mount and after any updates
   useEffect(() => {
-    // Ensure cache is up to date on mount
-    queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch("/api/user", {
+          credentials: "include"
+        });
+        const userData = await response.json();
+        queryClient.setQueryData(["/api/user"], userData);
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    };
+    
+    fetchUserData();
   }, [queryClient]);
 
   const passwordForm = useForm<PasswordFormData>({
@@ -99,9 +111,14 @@ export default function ProfilePage() {
       const updatedUser = await response.json();
       return updatedUser;
     },
-    onSuccess: (updatedUser) => {
-      queryClient.setQueryData(["/api/user"], updatedUser);
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    onSuccess: async () => {
+      // Fetch fresh user data after update
+      const response = await fetch("/api/user", {
+        credentials: "include"
+      });
+      const freshUserData = await response.json();
+      queryClient.setQueryData(["/api/user"], freshUserData);
+      
       toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
@@ -137,10 +154,13 @@ export default function ProfilePage() {
       }
 
       const updatedUser = await response.json();
-      queryClient.setQueryData(["/api/user"], (oldData: any) => ({
-        ...oldData,
-        ...updatedUser
-      }));
+      
+      // Fetch fresh user data after photo upload
+      const freshResponse = await fetch("/api/user", {
+        credentials: "include"
+      });
+      const freshUserData = await freshResponse.json();
+      queryClient.setQueryData(["/api/user"], freshUserData);
 
       toast({
         title: "Photo uploaded",
