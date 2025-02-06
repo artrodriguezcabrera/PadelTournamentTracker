@@ -558,9 +558,9 @@ export function registerRoutes(app: Express): Server {
       res.json(updatedUser);
     } catch (error) {
       console.error("Error updating profile:", error);
-      res.status(500).json({ 
-        message: "Failed to update profile", 
-        error: error instanceof Error ? error.message : "Unknown error" 
+      res.status(500).json({
+        message: "Failed to update profile",
+        error: error instanceof Error ? error.message : "Unknown error"
       });
     }
   });
@@ -611,9 +611,9 @@ export function registerRoutes(app: Express): Server {
       res.json(updatedUser);
     } catch (error) {
       console.error("Error uploading file:", error);
-      res.status(500).json({ 
-        message: "Failed to upload photo", 
-        error: error instanceof Error ? error.message : "Unknown error" 
+      res.status(500).json({
+        message: "Failed to upload photo",
+        error: error instanceof Error ? error.message : "Unknown error"
       });
     }
   });

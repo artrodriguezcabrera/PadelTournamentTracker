@@ -20,7 +20,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
-// Schema definitions remain the same
 const passwordFormSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
   newPassword: z.string().min(6, "Password must be at least 6 characters"),
@@ -57,7 +56,7 @@ export default function ProfilePage() {
         console.error("Error fetching user data:", error);
       }
     };
-    
+
     fetchUserData();
   }, [queryClient]);
 
@@ -118,7 +117,7 @@ export default function ProfilePage() {
       });
       const freshUserData = await response.json();
       queryClient.setQueryData(["/api/user"], freshUserData);
-      
+
       toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
@@ -154,7 +153,7 @@ export default function ProfilePage() {
       }
 
       const updatedUser = await response.json();
-      
+
       // Fetch fresh user data after photo upload
       const freshResponse = await fetch("/api/user", {
         credentials: "include"

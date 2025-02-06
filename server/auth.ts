@@ -13,7 +13,14 @@ import { z } from "zod";
 
 declare global {
   namespace Express {
-    interface User extends Omit<User, 'password'> {}
+    interface User {
+      id: number;
+      email: string;
+      name?: string | null;
+      profilePhoto?: string | null;
+      isAdmin: boolean;
+      createdAt: Date;
+    }
   }
 }
 
