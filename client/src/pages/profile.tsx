@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,6 +20,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
+// Schema definitions remain the same
 const passwordFormSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
   newPassword: z.string().min(6, "Password must be at least 6 characters"),
@@ -59,6 +60,13 @@ export default function ProfilePage() {
     },
   });
 
+  // Update form when user data changes
+  useEffect(() => {
+    if (user?.name) {
+      profileForm.reset({ name: user.name });
+    }
+  }, [user?.name, profileForm]);
+
   const updatePasswordMutation = useMutation({
     mutationFn: async (data: PasswordFormData) => {
       await apiRequest("POST", "/api/user/password", data);
@@ -82,9 +90,11 @@ export default function ProfilePage() {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: ProfileFormData) => {
-      await apiRequest("POST", "/api/user/profile", data);
+      const response = await apiRequest("POST", "/api/user/profile", data);
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      queryClient.setQueryData(["/api/user"], data);
       toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
@@ -164,8 +174,12 @@ export default function ProfilePage() {
             <CardContent className="space-y-6">
               <div className="flex flex-col items-center gap-4">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src={user?.profilePhoto || ""} alt={user?.name || user?.email} />
-                  <AvatarFallback>{user?.name?.[0] || user?.email?.[0]}</AvatarFallback>
+                  <AvatarImage 
+                    src={user?.profilePhoto || ""} 
+                    alt={user?.name || user?.email} />
+                  <AvatarFallback>
+                    {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
+                  </AvatarFallback>
                 </Avatar>
                 <div>
                   <Input
