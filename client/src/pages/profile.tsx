@@ -44,6 +44,11 @@ export default function ProfilePage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    // Ensure cache is up to date on mount
+    queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+  }, [queryClient]);
+
   const passwordForm = useForm<PasswordFormData>({
     resolver: zodResolver(passwordFormSchema),
     defaultValues: {
@@ -95,10 +100,8 @@ export default function ProfilePage() {
       return updatedUser;
     },
     onSuccess: (updatedUser) => {
-      queryClient.setQueryData(["/api/user"], (oldData: any) => ({
-        ...oldData,
-        ...updatedUser
-      }));
+      queryClient.setQueryData(["/api/user"], updatedUser);
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
