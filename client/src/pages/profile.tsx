@@ -91,10 +91,12 @@ export default function ProfilePage() {
   const updateProfileMutation = useMutation({
     mutationFn: async (data: ProfileFormData) => {
       const response = await apiRequest("POST", "/api/user/profile", data);
-      return response.json();
+      const updatedUser = await response.json();
+      return updatedUser;
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(["/api/user"], data);
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(["/api/user"], updatedUser);
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
@@ -131,6 +133,7 @@ export default function ProfilePage() {
 
       const updatedUser = await response.json();
       queryClient.setQueryData(["/api/user"], updatedUser);
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
 
       toast({
         title: "Photo uploaded",
@@ -174,8 +177,8 @@ export default function ProfilePage() {
             <CardContent className="space-y-6">
               <div className="flex flex-col items-center gap-4">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage 
-                    src={user?.profilePhoto || ""} 
+                  <AvatarImage
+                    src={user?.profilePhoto || ""}
                     alt={user?.name || user?.email} />
                   <AvatarFallback>
                     {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}

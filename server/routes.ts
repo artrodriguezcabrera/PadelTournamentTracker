@@ -527,20 +527,37 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/user/profile", requireAuth, async (req, res) => {
     const { name } = req.body;
 
-    const [updatedUser] = await db
-      .update(users)
-      .set({ name })
-      .where(eq(users.id, req.user!.id))
-      .returning({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-        profilePhoto: users.profilePhoto,
-        isAdmin: users.isAdmin,
-        createdAt: users.createdAt,
+    try {
+      const [updatedUser] = await db
+        .update(users)
+        .set({ name })
+        .where(eq(users.id, req.user!.id))
+        .returning({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          profilePhoto: users.profilePhoto,
+          isAdmin: users.isAdmin,
+          createdAt: users.createdAt,
+        });
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      console.log("Profile updated successfully:", {
+        userId: updatedUser.id,
+        name: updatedUser.name,
       });
 
-    res.json(updatedUser);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ 
+        message: "Failed to update profile", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
   });
 
   app.post("/api/user/photo", requireAuth, upload.single("photo"), async (req, res) => {
@@ -575,10 +592,15 @@ export function registerRoutes(app: Express): Server {
           createdAt: users.createdAt,
         });
 
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
       console.log("File uploaded successfully:", {
         filename,
         filepath,
-        userId: req.user!.id
+        userId: req.user!.id,
+        profilePhoto: updatedUser.profilePhoto
       });
 
       res.json(updatedUser);
