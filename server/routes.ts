@@ -521,7 +521,6 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Add the following routes inside registerRoutes function, before return httpServer:
-
   app.post("/api/user/profile", requireAuth, async (req, res) => {
     const { name } = req.body;
 
@@ -542,36 +541,51 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/user/photo", requireAuth, upload.single("photo"), async (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
 
-    // Generate a unique filename
-    const timestamp = Date.now();
-    const filename = `${req.user!.id}-${timestamp}-${req.file.originalname}`;
-    const filepath = path.join(process.cwd(), "uploads", filename);
+      // Ensure uploads directory exists
+      const uploadDir = path.join(process.cwd(), "uploads");
+      await fs.promises.mkdir(uploadDir, { recursive: true });
 
-    // Ensure uploads directory exists
-    await fs.promises.mkdir(path.join(process.cwd(), "uploads"), { recursive: true });
+      // Generate a unique filename
+      const timestamp = Date.now();
+      const filename = `${req.user!.id}-${timestamp}-${req.file.originalname}`;
+      const filepath = path.join(uploadDir, filename);
 
-    // Write the file
-    await fs.promises.writeFile(filepath, req.file.buffer);
+      // Write the file
+      await fs.promises.writeFile(filepath, req.file.buffer);
 
-    // Update user profile photo in database
-    const [updatedUser] = await db
-      .update(users)
-      .set({ profilePhoto: `/uploads/${filename}` })
-      .where(eq(users.id, req.user!.id))
-      .returning({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-        profilePhoto: users.profilePhoto,
-        isAdmin: users.isAdmin,
-        createdAt: users.createdAt,
+      // Update user profile photo in database
+      const [updatedUser] = await db
+        .update(users)
+        .set({ profilePhoto: `/uploads/${filename}` })
+        .where(eq(users.id, req.user!.id))
+        .returning({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          profilePhoto: users.profilePhoto,
+          isAdmin: users.isAdmin,
+          createdAt: users.createdAt,
+        });
+
+      console.log("File uploaded successfully:", {
+        filename,
+        filepath,
+        userId: req.user!.id
       });
 
-    res.json(updatedUser);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      res.status(500).json({ 
+        message: "Failed to upload photo", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
   });
 
   // Serve uploaded files

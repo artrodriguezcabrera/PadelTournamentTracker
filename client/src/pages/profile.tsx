@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Upload } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -41,6 +41,7 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const queryClient = useQueryClient();
 
   const passwordForm = useForm<PasswordFormData>({
     resolver: zodResolver(passwordFormSchema),
@@ -107,12 +108,26 @@ export default function ProfilePage() {
     formData.append("photo", file);
 
     try {
-      await apiRequest("POST", "/api/user/photo", formData);
+      const response = await fetch("/api/user/photo", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to upload photo");
+      }
+
+      const updatedUser = await response.json();
+      queryClient.setQueryData(["/api/user"], updatedUser);
+
       toast({
         title: "Photo uploaded",
         description: "Your profile photo has been updated successfully.",
       });
     } catch (error) {
+      console.error("Upload error:", error);
       toast({
         title: "Failed to upload photo",
         description: error instanceof Error ? error.message : "Unknown error occurred",
