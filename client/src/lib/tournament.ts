@@ -1,4 +1,4 @@
-import { type Game, type Player } from "@db/schema";
+import { type Game } from "@db/schema";
 
 type Standing = {
   playerId: number;
@@ -45,9 +45,9 @@ export function calculateStandings(
     }
 
     // Team 1 players
-    const team1Players = [game.player1Id, game.player2Id];
+    const team1Players = [game.player1Id, game.player2Id].filter(Boolean);
     // Team 2 players
-    const team2Players = [game.player3Id, game.player4Id];
+    const team2Players = [game.player3Id, game.player4Id].filter(Boolean);
 
     // Update games played
     [...team1Players, ...team2Players].forEach((playerId) => {

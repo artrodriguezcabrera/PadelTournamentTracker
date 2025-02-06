@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { type Tournament } from "@db/schema";
 import GameSchedule from "@/components/game-schedule";
 import StandingsTable from "@/components/standings-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 type TournamentWithRelations = Tournament & {
   tournamentPlayers: Array<{
@@ -30,6 +32,8 @@ export default function PublicTournament({ params }: { params: { publicId: strin
   const { data: tournament } = useQuery<TournamentWithRelations>({
     queryKey: [`/api/public/tournaments/${params.publicId}`],
   });
+  const [selectedRound, setSelectedRound] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState("games");
 
   if (!tournament) {
     return (
@@ -48,6 +52,10 @@ export default function PublicTournament({ params }: { params: { publicId: strin
     );
   }
 
+  const completedGames = tournament.games.filter(game => game.isComplete);
+  const rounds = [...new Set(tournament.games.map(game => game.roundNumber))];
+  const currentRound = selectedRound ?? rounds[0];
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-4 sm:py-8">
@@ -65,29 +73,49 @@ export default function PublicTournament({ params }: { params: { publicId: strin
           </div>
         </div>
 
-        <Tabs defaultValue="games" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="games">Games</TabsTrigger>
-            <TabsTrigger value="standings">Standings</TabsTrigger>
+        <Tabs defaultValue="games" onValueChange={setActiveTab}>
+          <TabsList className="w-full sm:w-auto mb-4">
+            <TabsTrigger value="games" className="flex-1 sm:flex-none">Games</TabsTrigger>
+            <TabsTrigger value="standings" className="flex-1 sm:flex-none">Standings</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="games" className="space-y-4">
+          {activeTab === "games" && (
+            <div className="flex flex-wrap gap-2 mb-6 overflow-x-auto pb-2">
+              {rounds.map((round) => (
+                <Button
+                  key={round}
+                  variant={currentRound === round ? "default" : "outline"}
+                  className={cn(
+                    "min-w-[3rem] flex-shrink-0",
+                    currentRound === round && "font-bold"
+                  )}
+                  onClick={() => setSelectedRound(round)}
+                >
+                  {round}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          <TabsContent value="games">
             <GameSchedule
-              games={tournament.games}
+              tournamentId={tournament.id}
+              games={tournament.games.filter(game => game.roundNumber === currentRound)}
+              pointSystem={tournament.pointSystem}
+              roundNumber={currentRound}
               isPublic={true}
             />
           </TabsContent>
 
           <TabsContent value="standings">
-            <Card>
-              <CardContent className="pt-6">
-                <StandingsTable
-                  games={tournament.games}
-                  players={tournament.tournamentPlayers.map(tp => tp.player)}
-                  pointSystem={tournament.pointSystem}
-                />
-              </CardContent>
-            </Card>
+            <StandingsTable
+              games={completedGames}
+              players={tournament.tournamentPlayers.map(tp => ({
+                id: tp.player.id,
+                name: tp.player.name
+              }))}
+              pointSystem={tournament.pointSystem}
+            />
           </TabsContent>
         </Tabs>
       </div>

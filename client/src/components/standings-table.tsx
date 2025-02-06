@@ -12,14 +12,9 @@ import { Trophy, Medal } from "lucide-react";
 import { type Game, type Player } from "@db/schema";
 import { cn } from "@/lib/utils";
 
-type TournamentPlayer = {
-  playerId: number;
-  player: Player;
-};
-
 type StandingsTableProps = {
   games: Game[];
-  players: TournamentPlayer[];
+  players: Array<{ id: number; name: string }>;
   pointSystem: number;
 };
 
@@ -28,12 +23,7 @@ export default function StandingsTable({
   players,
   pointSystem,
 }: StandingsTableProps) {
-  // Convert tournament players to the format expected by calculateStandings
-  const formattedPlayers = players.map(tp => ({
-    id: tp.playerId,
-    name: tp.player.name
-  }));
-  const standings = calculateStandings(games, formattedPlayers, pointSystem);
+  const standings = calculateStandings(games, players, pointSystem);
 
   // Sort standings by points first, then wins, then point difference
   const sortedStandings = [...standings].sort((a, b) => {
